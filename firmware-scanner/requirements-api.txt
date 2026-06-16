@@ -1,0 +1,28 @@
+# HELİX-Guard — FastAPI layer dependencies
+# Install with: pip install -r requirements-api.txt
+# The firmware_scanner package must also be installed: pip install -e .
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+sqlalchemy>=2.0.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.9
+pydantic-settings>=2.0.0
+
+# Faz 5 — async job queue (only needed if HELIX_USE_CELERY=true)
+celery[redis]>=5.3.0
+redis>=5.0.0
+
+# Faz 6 — schema migrations + PostgreSQL driver
+alembic>=1.13.0
+psycopg[binary]>=3.1
+
+# Faz 6 — object storage (only needed if HELIX_USE_OBJECT_STORAGE=true)
+minio>=7.2.0
+
+# Faz 7 — PDF reporting
+# Pure-Python HTML->PDF (WeasyPrint needs a GTK runtime that isn't pip-installable
+# on Windows; xhtml2pdf has no system dependencies and works everywhere)
+xhtml2pdf>=0.2.17
+jinja2>=3.1.0

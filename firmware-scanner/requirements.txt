@@ -1,0 +1,11 @@
+# Runtime
+click>=8.1.0
+
+# Optional: YARA pattern matching (scanner works without it, with a warning)
+# Install: pip install yara-python
+# Note: On Python 3.13+ may require compiling from source with YARA C library headers.
+yara-python>=4.2.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0

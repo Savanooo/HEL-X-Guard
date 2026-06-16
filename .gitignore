@@ -1,0 +1,39 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# ── Node / Next.js ───────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Secrets / environment ───────────────────────────────────────────────────
+.env
+.env.local
+*.env.local
+!*.env.example
+!.env.local.example
+
+# ── Runtime data (HELİX-Guard API) ──────────────────────────────────────────
+firmware-scanner/helix.db
+firmware-scanner/uploads/
+firmware-scanner/outputs/
+
+# ── OS / editor ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Stray local test artifacts ───────────────────────────────────────────────
+/test.bin
+/output_test/

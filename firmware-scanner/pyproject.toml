@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "firmware-scanner"
+version = "0.1.0"
+description = "HELİX-Guard: Static firmware binary security analysis CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "HELİX-Guard Contributors" }
+]
+keywords = ["firmware", "security", "binary", "analysis", "yara", "entropy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Information Technology",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "pyelftools>=0.30",
+]
+
+[project.optional-dependencies]
+yara = [
+    "yara-python>=4.2.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+
+[project.scripts]
+firmware-scan = "firmware_scanner.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.pytest.ini_options]
+testpaths     = ["tests"]
+pythonpath    = ["src"]
+python_files  = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "-v",
+    "--tb=short",
+]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks end-to-end integration tests",
+    "requires_binwalk: marks tests that need binwalk installed",
+    "requires_yara: marks tests that need yara-python installed",
+]
+
+[tool.coverage.run]
+source = ["firmware_scanner"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]

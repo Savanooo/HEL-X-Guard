@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4;
+    margin: 2cm 1.5cm 1.8cm 1.5cm;
+    @frame footer_frame {
+      -pdf-frame-content: footer_content;
+      bottom: 0.8cm; margin-left: 1.5cm; margin-right: 1.5cm; height: 1cm;
+    }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1e293b; }
+  h1 { font-size: 18pt; margin-bottom: 2px; color: #0f172a; }
+  h2 { font-size: 13pt; margin-top: 18px; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; color: #334155; }
+  .subtitle { color: #64748b; font-size: 9pt; margin-bottom: 16px; }
+  .risk-badge {
+    display: inline-block; padding: 5px 16px; border-radius: 4px;
+    font-weight: bold; font-size: 13pt; color: white;
+    background-color: {{ risk_color }};
+  }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  td, th { padding: 4px 6px; font-size: 9pt; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+  th { background-color: #f1f5f9; color: #475569; }
+  .kv-label { width: 110px; color: #64748b; font-weight: bold; }
+  .mono { font-family: Courier, monospace; font-size: 8pt; word-wrap: break-word; }
+  .reasons { margin: 6px 0 0 0; padding-left: 18px; }
+  .reasons li { margin-bottom: 3px; }
+  .cat-badge {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 7.5pt; font-weight: bold; color: white;
+  }
+  .muted { color: #94a3b8; }
+  #footer_content { font-size: 8pt; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>HELIX-Guard Firmware Security Report</h1>
+  <p class="subtitle">
+    Scan ID: {{ report.scan_id }}
+    {% if scan.created_at %}&nbsp;|&nbsp;Uploaded: {{ scan.created_at }}{% endif %}
+    {% if scan.completed_at %}&nbsp;|&nbsp;Scanned: {{ scan.completed_at }}{% endif %}
+  </p>
+
+  <h2>Risk Assessment</h2>
+  <p><span class="risk-badge">{{ report.risk.level | upper }} &mdash; {{ report.risk.score }}/100</span></p>
+  {% if report.risk.reasons %}
+  <ul class="reasons">
+    {% for reason in report.risk.reasons %}
+    <li>{{ reason }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2>File Metadata</h2>
+  <table>
+    <tr><td class="kv-label">Name</td><td>{{ report.file.name }}</td></tr>
+    <tr><td class="kv-label">Size</td><td>{{ report.file.size.human }} ({{ report.file.size.bytes }} bytes)</td></tr>
+    <tr><td class="kv-label">Type</td><td>{{ report.file.type }}</td></tr>
+    <tr><td class="kv-label">SHA-256</td><td class="mono">{{ report.file.hashes.sha256 }}</td></tr>
+    <tr><td class="kv-label">SHA-1</td><td class="mono">{{ report.file.hashes.sha1 }}</td></tr>
+    <tr><td class="kv-label">MD5</td><td class="mono">{{ report.file.hashes.md5 }}</td></tr>
+    <tr><td class="kv-label">Entropy</td><td>{{ "%.3f"|format(report.entropy.overall) }} / 8.00 &mdash; {{ report.entropy.interpretation }}</td></tr>
+  </table>
+
+  {% if report.elf and report.elf.is_elf %}
+  <h2>ELF Analysis</h2>
+  <table>
+    <tr><td class="kv-label">Architecture</td><td>{{ report.elf.header.machine }} ({{ report.elf.header.class }}, {{ report.elf.header.endianness }})</td></tr>
+    <tr><td class="kv-label">Type</td><td>{{ report.elf.header.type }}</td></tr>
+    <tr><td class="kv-label">Entry point</td><td class="mono">{{ report.elf.header.entry_point }}</td></tr>
+    <tr><td class="kv-label">PIE</td><td>{{ "Yes" if report.elf.security.pie else "No" }}</td></tr>
+    <tr><td class="kv-label">NX</td><td>{{ "Yes" if report.elf.security.nx else "No" }}</td></tr>
+    <tr><td class="kv-label">RELRO</td><td>{{ report.elf.security.relro }}</td></tr>
+    <tr><td class="kv-label">Stripped</td><td>{{ "Yes" if report.elf.security.stripped else "No" }}</td></tr>
+    {% if report.elf.shared_libraries %}
+    <tr><td class="kv-label">Linked libs</td><td>{{ report.elf.shared_libraries | join(", ") }}</td></tr>
+    {% endif %}
+  </table>
+  {% endif %}
+
+  <h2>Suspicious Strings ({{ report.strings.suspicious_count }} of {{ report.strings.total }})</h2>
+  {% if report.strings.suspicious %}
+  <table>
+    <tr><th>Category</th><th>Value</th><th>Offset</th></tr>
+    {% for s in report.strings.suspicious[:60] %}
+    <tr>
+      <td><span class="cat-badge" style="background-color: {{ cat_colors.get(s.category, '#64748b') }}">{{ s.category }}</span></td>
+      <td class="mono">{{ s.value[:100] }}</td>
+      <td class="mono">0x{{ "%06x"|format(s.offset) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if report.strings.suspicious | length > 60 %}
+  <p class="muted"><em>&hellip; and {{ report.strings.suspicious | length - 60 }} more findings (see full JSON report)</em></p>
+  {% endif %}
+  {% else %}
+  <p class="muted">No suspicious strings found.</p>
+  {% endif %}
+
+  <h2>YARA Matches ({{ report.yara.matches | length }})</h2>
+  {% if report.yara.matches %}
+  <table>
+    <tr><th>Rule</th><th>Severity</th></tr>
+    {% for m in report.yara.matches %}
+    <tr><td>{{ m.rule }}</td><td>{{ (m.severity or "low") | upper }}</td></tr>
+    {% endfor %}
+  </table>
+  {% elif report.yara.error %}
+  <p class="muted">YARA unavailable: {{ report.yara.error }}</p>
+  {% else %}
+  <p class="muted">No YARA matches.</p>
+  {% endif %}
+
+  <h2>Binwalk Findings ({{ report.binwalk.findings | length }})</h2>
+  {% if report.binwalk.findings %}
+  <table>
+    <tr><th>Offset</th><th>Description</th></tr>
+    {% for f in report.binwalk.findings %}
+    <tr><td class="mono">{{ f.hex_offset }}</td><td>{{ f.description }}</td></tr>
+    {% endfor %}
+  </table>
+  {% elif report.binwalk.error %}
+  <p class="muted">Binwalk unavailable: {{ report.binwalk.error }}</p>
+  {% else %}
+  <p class="muted">No binwalk findings.</p>
+  {% endif %}
+
+  <div id="footer_content">
+    HELIX-Guard Firmware Security Platform &mdash; Generated {{ generated_at }} &mdash; Confidential
+  </div>
+</body>
+</html>

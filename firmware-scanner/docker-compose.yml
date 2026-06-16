@@ -1,0 +1,56 @@
+# HELİX-Guard Scanner — Docker Compose
+#
+# Usage:
+#   # Build the image
+#   docker compose build
+#
+#   # Scan a firmware file
+#   SCAN_INPUT_DIR=/path/to/dir SCAN_OUTPUT_DIR=/path/to/output \
+#     docker compose run --rm scanner firmware.bin --output /output/report.json
+#
+#   # Or use docker run directly (more control):
+#   docker run --rm --network none --read-only \
+#     --tmpfs /tmp:size=256m --memory 1g --cpus 1 \
+#     --security-opt no-new-privileges:true \
+#     -v /path/to/firmware.bin:/input/firmware.bin:ro \
+#     -v /path/to/output:/output \
+#     helix-guard-scanner:latest \
+#     /input/firmware.bin --output /output/report.json
+
+services:
+  scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: helix-guard-scanner:latest
+
+    # Security: no network access during analysis
+    network_mode: none
+
+    # Security: immutable root filesystem
+    read_only: true
+
+    # Writable /tmp inside the container (for binwalk temp files)
+    tmpfs:
+      - /tmp:size=256m
+
+    # Resource limits
+    mem_limit: 1g
+    cpus: 1
+
+    # Prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+
+    # Mount points — override with environment variables
+    volumes:
+      - type: bind
+        source: ${SCAN_INPUT_DIR:-/tmp}
+        target: /input
+        read_only: true
+      - type: bind
+        source: ${SCAN_OUTPUT_DIR:-/tmp/helix-output}
+        target: /output
+
+    # Default: print help
+    command: ["--help"]
