@@ -530,8 +530,8 @@ function DecompileFunctions({ functions }: { functions: { name: string; address:
         onChange={e => setSearch(e.target.value)}
         className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs mb-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
       />
-      <div className="max-h-64 overflow-y-auto space-y-1">
-        {filtered.slice(0, 100).map((fn, i) => (
+      <div className="max-h-96 overflow-y-auto space-y-1">
+        {filtered.map((fn, i) => (
           <div key={i} className="border border-slate-100 rounded-lg overflow-hidden">
             <button
               onClick={() => setOpen(open === i ? null : i)}
@@ -547,8 +547,8 @@ function DecompileFunctions({ functions }: { functions: { name: string; address:
             )}
           </div>
         ))}
-        {filtered.length > 100 && (
-          <p className="text-xs text-slate-400 text-center pt-1">… and {filtered.length - 100} more</p>
+        {filtered.length === 0 && search && (
+          <p className="text-xs text-slate-400 text-center py-4">No functions match &ldquo;{search}&rdquo;</p>
         )}
       </div>
     </div>
