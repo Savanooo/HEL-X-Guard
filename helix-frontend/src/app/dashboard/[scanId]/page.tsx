@@ -646,7 +646,7 @@ function groupByBlock(fns: FnEntry[], blockSize = 0x1000) {
     if (!map.has(blockStart)) map.set(blockStart, []);
     map.get(blockStart)!.push(fn);
   }
-  return [...map.entries()]
+  return Array.from(map.entries())
     .sort(([a], [b]) => a - b)
     .map(([start, items]) => ({
       key:   `0x${start.toString(16).padStart(8, "0")}`,
