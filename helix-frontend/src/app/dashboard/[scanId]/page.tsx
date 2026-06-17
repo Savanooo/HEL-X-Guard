@@ -517,19 +517,40 @@ export default function ScanDetailPage() {
 function DecompileFunctions({ functions }: { functions: { name: string; address: string; code: string }[] }) {
   const [open, setOpen] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const filtered = functions.filter(f =>
-    f.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const [searchCode, setSearchCode] = useState(false);
+  const q = search.toLowerCase();
+  const filtered = q
+    ? functions.filter(f =>
+        f.name.toLowerCase().includes(q) ||
+        (searchCode && f.code.toLowerCase().includes(q))
+      )
+    : functions;
   return (
     <div className="mt-3">
       <p className="text-xs text-slate-600 mb-2 font-medium">{functions.length} function(s) decompiled</p>
-      <input
-        type="text"
-        placeholder="Filter functions…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs mb-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
-      />
+      <div className="flex gap-2 items-center mb-2">
+        <input
+          type="text"
+          placeholder="Filter functions…"
+          value={search}
+          onChange={e => { setSearch(e.target.value); setOpen(null); }}
+          className="flex-1 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+        <label className="flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={searchCode}
+            onChange={e => setSearchCode(e.target.checked)}
+            className="accent-blue-500"
+          />
+          search code
+        </label>
+      </div>
+      {search && (
+        <p className="text-xs text-slate-400 mb-1">
+          {filtered.length} match{filtered.length !== 1 ? "es" : ""}{searchCode ? " (name + code)" : " (name)"}
+        </p>
+      )}
       <div className="max-h-96 overflow-y-auto space-y-1">
         {filtered.map((fn, i) => (
           <div key={i} className="border border-slate-100 rounded-lg overflow-hidden">
@@ -548,7 +569,10 @@ function DecompileFunctions({ functions }: { functions: { name: string; address:
           </div>
         ))}
         {filtered.length === 0 && search && (
-          <p className="text-xs text-slate-400 text-center py-4">No functions match &ldquo;{search}&rdquo;</p>
+          <p className="text-xs text-slate-400 text-center py-4">
+            No functions match &ldquo;{search}&rdquo;
+            {!searchCode && " — try enabling \"search code\""}
+          </p>
         )}
       </div>
     </div>
