@@ -62,7 +62,25 @@ _CATEGORY_PRIORITY = [
 ]
 
 
+def _is_repetitive(s: str, max_period: int = 4, threshold: float = 0.80) -> bool:
+    """Detect ARM/machine-code byte patterns that appear as repetitive ASCII strings.
+
+    e.g. 'MkMkMkMkMk', 'BBJBJBJB', 'snkmkmkm' — all have a short repeating unit.
+    Real API keys/credentials are pseudo-random and won't pass this check.
+    """
+    n = len(s)
+    if n < 12:
+        return False
+    for period in range(1, min(max_period + 1, n // 2 + 1)):
+        matches = sum(s[i] == s[i % period] for i in range(n))
+        if matches / n >= threshold:
+            return True
+    return False
+
+
 def _classify(s: str) -> str | None:
+    if _is_repetitive(s):
+        return None
     for category in _CATEGORY_PRIORITY:
         if _PATTERNS[category].search(s):
             return category
