@@ -52,7 +52,7 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="max-w-xl mx-auto">
       {/* Header */}
       <h1 className="text-2xl font-bold text-slate-900 mb-1">New Scan</h1>
       <p className="text-slate-500 text-sm mb-8">

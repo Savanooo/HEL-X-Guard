@@ -167,7 +167,7 @@ export default function ScanDetailPage() {
 
   if (!scan) {
     return (
-      <div className="p-8">
+      <div>
         <p className="text-red-600">Scan not found.</p>
         <button onClick={() => router.back()} className="mt-2 text-sm text-blue-600">
           ← Back
@@ -193,7 +193,7 @@ export default function ScanDetailPage() {
     binwalkInfo.findings ?? [];
 
   return (
-    <div className="p-8 max-w-5xl space-y-6">
+    <div className="space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
         <button onClick={() => router.push("/dashboard")} className="text-blue-600 hover:underline">
