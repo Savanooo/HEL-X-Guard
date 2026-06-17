@@ -41,7 +41,14 @@ _PATTERNS: dict[str, re.Pattern] = {
     "DEBUG_KEYWORD": re.compile(
         r'\b(?:backdoor|debug_mode|test_mode|hardcoded|factory_reset'
         r'|ENABLE_DEBUG|service_mode|engineering_mode|maintenance_mode'
-        r'|diagnostic_mode|TODO|FIXME|HACK|XXX)\b',
+        r'|diagnostic_mode|TODO|FIXME|HACK|XXX'
+        # STM32 / embedded-specific bypass & protection flags
+        r'|NO_MPU|NO_RDP|NO_RDP_CHECK|RDP_BYPASS|DISABLE_MPU'
+        r'|calibration_mode|no_water_test|factory_mode|demo_mode'
+        r'|no_encrypt|TEST_BYPASS|UNLOCK_KEY|secret_pattern'
+        r'|GUI_HIDDEN|HIDDEN_SETTING|hidden_menu|service_code'
+        r'|LOGCF10|semihosting|BKPT|DFU_MODE|BOOT_BYPASS'
+        r')\b',
         re.IGNORECASE,
     ),
     "NETWORK_SERVICE": re.compile(

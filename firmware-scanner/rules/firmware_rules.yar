@@ -428,6 +428,143 @@ rule FirmwareVersionString
         any of them
 }
 
+// ─────────────────────────────────────────────────────────────
+// STM32 / EMBEDDED MCU — SPECIFIC RULES
+// ─────────────────────────────────────────────────────────────
+
+rule STM32NoReadProtection
+{
+    meta:
+        description = "STM32 read-out protection disabled — full firmware extraction via SWD possible"
+        severity    = "high"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "NO_RDP_CHECK"   ascii nocase
+        $s2 = "NO_RDP"         ascii
+        $s3 = "RDP_BYPASS"     ascii nocase
+        $s4 = "RDP Level 0"    ascii nocase
+        $s5 = "rdp_level"      ascii nocase
+
+    condition:
+        any of them
+}
+
+rule MPUDisabledFlag
+{
+    meta:
+        description = "ARM Cortex-M MPU explicitly disabled — no hardware memory isolation"
+        severity    = "medium"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "NO_MPU"         ascii
+        $s2 = "MPU_DISABLED"   ascii nocase
+        $s3 = "DISABLE_MPU"    ascii nocase
+        $s4 = "mpu_disable"    ascii nocase
+
+    condition:
+        any of them
+}
+
+rule HiddenServiceMenu
+{
+    meta:
+        description = "Hidden engineering/service menu accessible via hardcoded key sequence"
+        severity    = "high"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "GUI_HIDDEN_SETTING"    ascii nocase
+        $s2 = "HIDDEN_SETTING"        ascii nocase
+        $s3 = "secret_pattern"        ascii nocase
+        $s4 = "proc_gui_key"          ascii nocase
+        $s5 = "hidden_menu"           ascii nocase
+        $s6 = "service_code"          ascii nocase
+        $s7 = "SERVICE_MODE"          ascii nocase
+
+    condition:
+        any of them
+}
+
+rule SafetyBypassFlags
+{
+    meta:
+        description = "Safety-bypass or test-mode flags in production firmware (patient-safety risk)"
+        severity    = "high"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "no_water_test"    ascii nocase
+        $s2 = "calibration_mode" ascii nocase
+        $s3 = "factory_mode"     ascii nocase
+        $s4 = "demo_mode"        ascii nocase
+        $s5 = "NO_SAFETY"        ascii nocase
+        $s6 = "BYPASS_SAFETY"    ascii nocase
+        $s7 = "test_mode"        ascii nocase
+
+    condition:
+        2 of them
+}
+
+rule STM32FlashUnlockSequence
+{
+    meta:
+        description = "STM32 Flash unlock key constants — flash write/erase capability present"
+        severity    = "medium"
+        author      = "HELİX-Guard"
+
+    strings:
+        // STM32 FLASH_KEYR values: 0x45670123 and 0xCDEF89AB (little-endian)
+        $key1 = { 23 01 67 45 }
+        $key2 = { AB 89 EF CD }
+        $key3 = "FLASH_If_Write"   ascii nocase
+        $key4 = "FLASH_Unlock"     ascii nocase
+        $key5 = "XTXUNLOCK"        ascii nocase
+        $key6 = "XTXERASE"         ascii nocase
+
+    condition:
+        2 of them
+}
+
+rule UnsignedFirmwareUpdateBypass
+{
+    meta:
+        description = "Unsigned firmware update path with developer TEST bypass — critical integrity risk"
+        severity    = "critical"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "cf10.bin"       ascii nocase
+        $s2 = "FLASH_If_Write" ascii nocase
+        $s3 = "TEST"           ascii
+        $s4 = "0:/cf10"        ascii nocase
+        $s5 = "sd_update"      ascii nocase
+        $s6 = "fw_update"      ascii nocase
+
+    condition:
+        2 of them
+}
+
+rule SemihostingDebugTraps
+{
+    meta:
+        description = "ARM semihosting BKPT #0xAB traps — halt device if no debugger attached"
+        severity    = "medium"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "semihosting"    ascii nocase
+        $s2 = "DBGMCU_IDCODE"  ascii nocase
+        $s3 = "ITM_SendChar"   ascii nocase
+        $s4 = "SWO"            ascii
+        // BKPT #0xAB instruction bytes: AB BE (Thumb encoding)
+        $bkpt = { AB BE }
+
+    condition:
+        2 of them
+}
+
 rule MedicalDeviceSensitiveStrings
 {
     meta:
