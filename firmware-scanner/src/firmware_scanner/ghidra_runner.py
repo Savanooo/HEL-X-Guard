@@ -136,7 +136,7 @@ def decompile(
             cmd += ["-processor", processor, "-cspec", "default"]
             if base_address:
                 cmd += ["-loader", "BinaryLoader",
-                        f"-loader-baseAddr={base_address}"]
+                        "-loader-baseAddr", base_address]
 
         cmd += [
             "-scriptPath", tmp,
