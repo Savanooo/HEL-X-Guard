@@ -15,30 +15,29 @@ from pathlib import Path
 
 DEFAULT_TIMEOUT = 600  # seconds — full headless analysis can be slow
 
-_EXPORT_SCRIPT = '''# Ghidra Jython post-script: dump decompiled pseudocode per function as JSON.
-import json
-from ghidra.app.decompiler import DecompInterface
-
-decompiler = DecompInterface()
-decompiler.openProgram(currentProgram)
-
-results = []
-fm = currentProgram.getFunctionManager()
-for func in fm.getFunctions(True):
-    res = decompiler.decompileFunction(func, 30, monitor)
-    if res.decompileCompleted():
-        results.append({
-            "name": func.getName(),
-            "address": str(func.getEntryPoint()),
-            "code": res.getDecompiledFunction().getC(),
-        })
+_EXPORT_SCRIPT = '''import json, traceback
+try:
+    from ghidra.app.decompiler import DecompInterface
+    decompiler = DecompInterface()
+    decompiler.openProgram(currentProgram)
+    results = []
+    fm = currentProgram.getFunctionManager()
+    for func in fm.getFunctions(True):
+        res = decompiler.decompileFunction(func, 30, monitor)
+        if res.decompileCompleted():
+            results.append({
+                "name": func.getName(),
+                "address": str(func.getEntryPoint()),
+                "code": res.getDecompiledFunction().getC(),
+            })
+    decompiler.dispose()
+    out = {"functions": results, "error": None}
+except Exception as e:
+    out = {"functions": [], "error": traceback.format_exc()}
 
 out_path = getScriptArgs()[0]
-f = open(out_path, "w")
-f.write(json.dumps(results))
-f.close()
-
-decompiler.dispose()
+with open(out_path, "w") as f:
+    f.write(json.dumps(out))
 '''
 
 
@@ -111,8 +110,17 @@ def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> d
             return {"available": True, "error": "Ghidra produced no output file", "functions": []}
 
         try:
-            functions = json.loads(result_json.read_text(encoding="utf-8"))
+            data = json.loads(result_json.read_text(encoding="utf-8"))
         except Exception as exc:  # noqa: BLE001
             return {"available": True, "error": f"Failed to parse Ghidra output: {exc}", "functions": []}
+
+        if isinstance(data, list):
+            functions, script_error = data, None
+        else:
+            functions = data.get("functions", [])
+            script_error = data.get("error")
+
+        if script_error:
+            return {"available": True, "error": f"Ghidra script error: {script_error}", "functions": functions}
 
     return {"available": True, "error": None, "functions": functions}
