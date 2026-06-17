@@ -269,9 +269,9 @@ export default function ScanDetailPage() {
                 <h2 className="font-semibold text-slate-700 text-sm tracking-tight">Risk Assessment</h2>
               </div>
               <div className="p-5">
-                <div className="flex items-center gap-5 mb-4">
+                <div className="flex flex-col items-center mb-4">
                   <RiskGauge score={scan.risk_score ?? 0} level={scan.risk_level ?? "informational"} />
-                  <div>
+                  <div className="mt-2 text-center">
                     <RiskBadge level={scan.risk_level ?? "informational"} score={scan.risk_score} large />
                     <p className="text-xs text-slate-400 mt-1">
                       {yaraMatches.length} YARA · {suspicious.length} strings
