@@ -98,7 +98,8 @@ def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> d
             return {"available": True, "error": f"Ghidra execution failed: {exc}", "functions": []}
 
         if proc.returncode != 0:
-            detail = (proc.stderr or proc.stdout or "")[-2000:].strip()
+            combined = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
+            detail = combined[-3000:]
             return {
                 "available": True,
                 "error": f"Ghidra exited with code {proc.returncode}: {detail}",
