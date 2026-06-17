@@ -15,7 +15,13 @@ from pathlib import Path
 
 DEFAULT_TIMEOUT = 600  # seconds — full headless analysis can be slow
 
-_EXPORT_SCRIPT = '''import json, traceback
+_EXPORT_SCRIPT = '''import json, traceback, os
+
+out_path = os.environ.get("HELIX_GHIDRA_OUTPUT", "")
+if not out_path:
+    raise RuntimeError("HELIX_GHIDRA_OUTPUT env var not set")
+
+out = {"functions": [], "error": None}
 try:
     from ghidra.app.decompiler import DecompInterface
     decompiler = DecompInterface()
@@ -34,10 +40,9 @@ try:
     out = {"functions": results, "error": None}
 except Exception as e:
     out = {"functions": [], "error": traceback.format_exc()}
-
-out_path = getScriptArgs()[0]
-with open(out_path, "w") as f:
-    f.write(json.dumps(out))
+finally:
+    with open(out_path, "w") as f:
+        f.write(json.dumps(out))
 '''
 
 
@@ -86,12 +91,14 @@ def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> d
             str(analyzer), str(project_dir), "helix_project",
             "-import", str(path),
             "-scriptPath", tmp,
-            "-postScript", "ExportDecompiled.py", str(result_json),
+            "-postScript", "ExportDecompiled.py",
             "-deleteProject",
         ]
 
+        run_env = {**os.environ, "HELIX_GHIDRA_OUTPUT": str(result_json)}
+
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=run_env)
         except subprocess.TimeoutExpired:
             return {"available": True, "error": f"Ghidra timed out after {timeout}s", "functions": []}
         except Exception as exc:  # noqa: BLE001
