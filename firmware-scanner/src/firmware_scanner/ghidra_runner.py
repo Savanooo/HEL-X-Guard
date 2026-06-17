@@ -82,6 +82,7 @@ def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> d
         script_path.write_text(_EXPORT_SCRIPT, encoding="utf-8")
 
         project_dir = Path(tmp) / "project"
+        project_dir.mkdir(parents=True, exist_ok=True)
         cmd = [
             str(analyzer), str(project_dir), "helix_project",
             "-import", str(path),
