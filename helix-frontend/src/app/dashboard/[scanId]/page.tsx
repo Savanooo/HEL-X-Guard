@@ -417,12 +417,8 @@ export default function ScanDetailPage() {
                 {scan.extraction_error && (
                   <p className="text-xs text-slate-500 mt-2">⚠ {scan.extraction_error}</p>
                 )}
-                {scan.extraction?.extracted && scan.extraction.extracted.length > 0 && (
-                  <ul className="mt-3 space-y-0.5 max-h-32 overflow-y-auto">
-                    {scan.extraction.extracted.slice(0, 20).map((f: string, i: number) => (
-                      <li key={i} className="text-xs font-mono text-slate-600 truncate">{f}</li>
-                    ))}
-                  </ul>
+                {scan.extraction_status === "completed" && scan.extraction && (
+                  <ExtractionResults extraction={scan.extraction} />
                 )}
               </div>
 
@@ -507,6 +503,73 @@ export default function ScanDetailPage() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Extraction results ────────────────────────────────────────────────────────
+
+interface ExtractedFile {
+  path: string;
+  name: string;
+  size: number | null;
+  sha256: string | null;
+}
+
+function ExtractionResults({ extraction }: { extraction: Record<string, unknown> }) {
+  const findings = (extraction.findings as { offset: number; hex_offset: string; description: string }[]) ?? [];
+  const rawExtracted = (extraction.extracted as (string | ExtractedFile)[]) ?? [];
+  const files: ExtractedFile[] = rawExtracted.map(f =>
+    typeof f === "string" ? { path: f, name: f.split("/").pop() ?? f, size: null, sha256: null } : f
+  );
+
+  return (
+    <div className="mt-3 space-y-3">
+      {/* Binwalk signatures */}
+      {findings.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium text-slate-600 mb-1">{findings.length} signature(s) detected</p>
+          <div className="max-h-36 overflow-y-auto space-y-0.5 bg-slate-50 rounded-lg px-2 py-1.5">
+            {findings.map((f, i) => (
+              <div key={i} className="flex gap-2 text-xs">
+                <span className="font-mono text-slate-400 w-20 flex-shrink-0">{f.hex_offset}</span>
+                <span className="text-slate-600 truncate">{f.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400">No embedded signatures detected by binwalk.</p>
+      )}
+
+      {/* Extracted files with hashes */}
+      {files.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium text-slate-600 mb-1">{files.length} file(s) extracted</p>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {files.map((f, i) => (
+              <div key={i} className="border border-slate-100 rounded-lg p-2 text-xs">
+                <p className="font-mono text-slate-800 font-medium truncate">{f.name}</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-0.5 text-slate-400">
+                  {f.size != null && <span>{fmtSize(f.size)}</span>}
+                  {f.sha256 && (
+                    <span className="font-mono">
+                      SHA256: {f.sha256.slice(0, 16)}&hellip;
+                    </span>
+                  )}
+                </div>
+                {f.sha256 && (
+                  <p className="font-mono text-slate-300 text-xs mt-0.5 break-all">{f.sha256}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400">
+          No files extracted — raw ARM firmware with no embedded filesystems or compressed sections.
+        </p>
       )}
     </div>
   );

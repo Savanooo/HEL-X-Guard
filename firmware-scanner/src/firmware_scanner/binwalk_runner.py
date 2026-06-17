@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import subprocess
@@ -28,6 +29,14 @@ def _find_binwalk() -> str:
     if exe is None:
         raise BinwalkNotFoundError("binwalk not found in PATH")
     return exe
+
+
+def _hash_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _parse_output(stdout: str) -> list[dict]:
@@ -119,7 +128,22 @@ def extract(path: Path, output_dir: Path, timeout: int = EXTRACT_TIMEOUT) -> dic
             "error": f"binwalk exited with code {result.returncode}: {result.stderr.strip()}",
         }
 
-    extracted = [str(p) for p in output_dir.rglob("*") if p.is_file()]
+    extracted = []
+    for p in sorted(output_dir.rglob("*")):
+        if not p.is_file():
+            continue
+        try:
+            sha256 = _hash_file(p)
+            size = p.stat().st_size
+        except Exception:
+            sha256 = None
+            size = None
+        extracted.append({
+            "path": str(p),
+            "name": p.name,
+            "size": size,
+            "sha256": sha256,
+        })
 
     return {
         "findings": _parse_output(result.stdout),
