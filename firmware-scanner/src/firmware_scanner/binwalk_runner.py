@@ -102,7 +102,7 @@ def extract(path: Path, output_dir: Path, timeout: int = EXTRACT_TIMEOUT) -> dic
 
     try:
         result = subprocess.run(
-            [exe, "-e", "-C", str(output_dir), str(path)],
+            [exe, "-e", "--run-as=root", "-C", str(output_dir), str(path)],
             capture_output=True,
             text=True,
             timeout=timeout,
