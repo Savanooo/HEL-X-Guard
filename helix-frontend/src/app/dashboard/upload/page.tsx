@@ -54,7 +54,7 @@ export default function UploadPage() {
   return (
     <div className="max-w-xl mx-auto">
       {/* Header */}
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">New Scan</h1>
+      <h1 className="text-xl font-bold text-white mb-1">New Scan</h1>
       <p className="text-slate-500 text-sm mb-8">
         Upload a firmware binary for static security analysis.
       </p>
@@ -67,10 +67,10 @@ export default function UploadPage() {
         onClick={() => inputRef.current?.click()}
         className={`relative cursor-pointer border-2 border-dashed rounded-2xl p-12 text-center transition-all ${
           dragging
-            ? "border-blue-500 bg-blue-50"
+            ? "border-blue-500 bg-blue-950/30"
             : file
-            ? "border-emerald-400 bg-emerald-50"
-            : "border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50"
+            ? "border-emerald-500 bg-emerald-950/20"
+            : "border-slate-700 bg-transparent hover:border-slate-500 hover:bg-slate-800/30"
         }`}
       >
         <input
@@ -84,27 +84,27 @@ export default function UploadPage() {
         {file ? (
           <div className="space-y-2">
             <div className="text-4xl">📦</div>
-            <p className="font-semibold text-slate-900">{file.name}</p>
-            <p className="text-slate-500 text-sm">{fmtSize(file.size)}</p>
+            <p className="font-semibold text-slate-200">{file.name}</p>
+            <p className="text-slate-400 text-sm">{fmtSize(file.size)}</p>
             <button
               onClick={(e) => { e.stopPropagation(); setFile(null); }}
-              className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+              className="text-xs text-slate-500 hover:text-red-400 transition-colors"
             >
               Remove
             </button>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="text-5xl opacity-30">📂</div>
+            <div className="text-5xl opacity-20">📂</div>
             <div>
-              <p className="font-semibold text-slate-700">
+              <p className="font-semibold text-slate-300">
                 Drop firmware file here
               </p>
               <p className="text-slate-500 text-sm mt-0.5">
                 or click to browse
               </p>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-600">
               Supported: {ALLOWED_EXTS.join("  ")} · Max 500 MB
             </p>
           </div>
@@ -113,7 +113,7 @@ export default function UploadPage() {
 
       {/* Error */}
       {error && (
-        <div className="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+        <div className="mt-4 bg-red-950/40 border border-red-800/40 text-red-300 rounded-xl px-4 py-3 text-sm">
           {error}
         </div>
       )}
@@ -126,7 +126,7 @@ export default function UploadPage() {
           { icon: "⚡", text: "Results ready in seconds (may take longer for large files)" },
           { icon: "📊", text: "Risk score 0–100 with detailed findings breakdown" },
         ].map(({ icon, text }) => (
-          <div key={text} className="flex items-start gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
+          <div key={text} className="flex items-start gap-2 bg-slate-800/60 border border-slate-700/40 rounded-xl px-3 py-2.5">
             <span>{icon}</span>
             <span>{text}</span>
           </div>
@@ -137,7 +137,7 @@ export default function UploadPage() {
       <button
         onClick={handleSubmit}
         disabled={!file || uploading}
-        className="mt-6 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-colors"
+        className="mt-6 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-colors"
       >
         {uploading ? (
           <>

@@ -42,12 +42,12 @@ export default function AuditPage() {
     <div className="">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Audit Log</h1>
+          <h1 className="text-xl font-bold text-white">Audit Log</h1>
           {data && <p className="text-slate-500 text-sm mt-0.5">{data.total} entries</p>}
         </div>
         <button
           onClick={load}
-          className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-sm px-3 py-1.5 rounded-lg transition-colors"
+          className="border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm px-3 py-1.5 rounded-lg transition-colors"
         >
           ↻ Refresh
         </button>
@@ -57,7 +57,7 @@ export default function AuditPage() {
         <select
           value={actionFilter}
           onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-          className="border border-slate-200 bg-white rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-slate-700 bg-slate-900/60 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Actions</option>
           {Object.entries(actionLabels).map(([value, label]) => (
@@ -68,19 +68,19 @@ export default function AuditPage() {
           value={usernameFilter}
           onChange={(e) => { setUsernameFilter(e.target.value); setPage(1); }}
           placeholder="Filter by username…"
-          className="border border-slate-200 bg-white rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-slate-700 bg-slate-900/60 rounded-lg px-3 py-1.5 text-sm text-slate-300 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16"><Spinner size={24} /></div>
       ) : data?.items.length === 0 ? (
-        <p className="text-slate-400 text-center py-16">No audit entries match the current filters.</p>
+        <p className="text-slate-500 text-center py-16">No audit entries match the current filters.</p>
       ) : (
         <>
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="border border-slate-700/60 rounded-xl overflow-hidden" style={{ background: "#161b27" }}>
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="border-b border-slate-700/60" style={{ background: "#0d1117" }}>
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Time</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">User</th>
@@ -90,26 +90,26 @@ export default function AuditPage() {
                   <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">IP</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-700/40">
                 {data!.items.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={entry.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="px-4 py-2.5 text-slate-500 text-xs whitespace-nowrap">{fmtDate(entry.created_at)}</td>
-                    <td className="px-4 py-2.5 font-medium text-slate-700">{entry.username ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-700">{actionLabels[entry.action] ?? entry.action}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-300">{entry.username ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-300">{actionLabels[entry.action] ?? entry.action}</td>
                     <td className="px-4 py-2.5 text-slate-500 text-xs font-mono">
                       {entry.resource_id ? `${entry.resource_type ?? ""} ${entry.resource_id.slice(0, 8)}…` : "—"}
                     </td>
                     <td className="px-4 py-2.5">
                       {entry.success ? (
-                        <span className="text-emerald-600 text-xs font-semibold">✓ Success</span>
+                        <span className="text-emerald-400 text-xs font-semibold">✓ Success</span>
                       ) : (
-                        <span className="text-red-500 text-xs font-semibold" title={entry.detail ?? ""}>✕ Failed</span>
+                        <span className="text-red-400 text-xs font-semibold" title={entry.detail ?? ""}>✕ Failed</span>
                       )}
                       {entry.detail && !entry.success && (
-                        <p className="text-xs text-slate-400 mt-0.5">{entry.detail}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{entry.detail}</p>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-400 text-xs font-mono">{entry.ip_address ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-500 text-xs font-mono">{entry.ip_address ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -117,7 +117,7 @@ export default function AuditPage() {
           </div>
 
           {data!.total > 50 && (
-            <div className="flex items-center justify-between mt-4 text-sm text-slate-600">
+            <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
               <span>
                 Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data!.total)} of {data!.total}
               </span>
@@ -125,14 +125,14 @@ export default function AuditPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg disabled:opacity-40 transition-colors"
+                  className="px-3 py-1.5 border border-slate-700 bg-slate-800 hover:bg-slate-700 rounded-lg disabled:opacity-40 transition-colors text-slate-400"
                 >
                   ← Prev
                 </button>
                 <button
                   onClick={() => setPage((p) => p + 1)}
                   disabled={page * 50 >= data!.total}
-                  className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg disabled:opacity-40 transition-colors"
+                  className="px-3 py-1.5 border border-slate-700 bg-slate-800 hover:bg-slate-700 rounded-lg disabled:opacity-40 transition-colors text-slate-400"
                 >
                   Next →
                 </button>
