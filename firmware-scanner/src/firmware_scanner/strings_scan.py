@@ -17,11 +17,11 @@ _PATTERNS: dict[str, re.Pattern] = {
     "CERTIFICATE": re.compile(r'-----BEGIN CERTIFICATE-----'),
     "API_KEY": re.compile(
         r'(?:'
-        r'AKIA[0-9A-Z]{16}'
-        r'|ASIA[0-9A-Z]{16}'
-        r'|eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+'
-        r'|[0-9a-fA-F]{32,}'
-        r'|[A-Za-z0-9+/]{40,}={0,2}'
+        r'AKIA[0-9A-Z]{16}'                                          # AWS access key
+        r'|ASIA[0-9A-Z]{16}'                                         # AWS temporary key
+        r'|eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+'  # JWT
+        r'|[0-9a-fA-F]{40,}'                                         # hex key/hash (SHA1+)
+        r'|[A-Za-z0-9+/]{60,}={1,2}'                                 # base64 with padding
         r')'
     ),
     "CREDENTIAL": re.compile(
@@ -39,11 +39,20 @@ _PATTERNS: dict[str, re.Pattern] = {
         re.IGNORECASE,
     ),
     "DEBUG_KEYWORD": re.compile(
-        r'\b(?:backdoor|debug_mode|test_mode|hardcoded|TODO|FIXME|factory_reset)\b',
+        r'\b(?:backdoor|debug_mode|test_mode|hardcoded|factory_reset'
+        r'|ENABLE_DEBUG|service_mode|engineering_mode|maintenance_mode'
+        r'|diagnostic_mode|TODO|FIXME|HACK|XXX)\b',
         re.IGNORECASE,
     ),
     "NETWORK_SERVICE": re.compile(
         r'\b(?:telnet|ftp|tftp|ssh|admin)\b.*\b\d{1,5}\b',
+        re.IGNORECASE,
+    ),
+    "VERSION": re.compile(
+        r'(?:[Vv]ersion|[Ff][Ww]\s*[Vv]er|SW\s*[Vv]er|HW\s*[Vv]er)\s*[:\s]\s*\d+\.\d+[\.\d]*',
+    ),
+    "CRYPTO": re.compile(
+        r'\b(?:MD5|SHA-?1\b|3DES|RC4|DES\b|ECB|AES-?128|AES-?256|RSA-?\d{3,4})\b',
         re.IGNORECASE,
     ),
 }
@@ -59,6 +68,8 @@ _CATEGORY_PRIORITY = [
     "SHELL_COMMAND",
     "DEBUG_KEYWORD",
     "NETWORK_SERVICE",
+    "CRYPTO",
+    "VERSION",
 ]
 
 
@@ -76,7 +87,7 @@ def _is_repetitive(s: str, max_period: int = 4, threshold: float = 0.85) -> bool
     if n < 16:
         return False
     # Stage 1: very few unique characters → almost certainly machine-code artifact
-    if len(set(s)) <= 4:
+    if len(set(s)) <= 5:
         return True
     # Stage 2: repeating unit check, with small skip to handle non-repeating prefix
     max_skip = min(6, n // 4)

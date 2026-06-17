@@ -20,8 +20,20 @@ function fmtSize(bytes: number | null) {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
+interface Stats { total: number; critical: number; high: number; medium: number; low: number; }
+
+function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className={`bg-white border rounded-xl px-5 py-4 shadow-sm ${color}`}>
+      <p className="text-2xl font-bold text-slate-900">{value}</p>
+      <p className="text-xs text-slate-500 mt-0.5 font-medium uppercase tracking-wide">{label}</p>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<ScanList | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [riskFilter, setRiskFilter] = useState("");
@@ -37,6 +49,25 @@ export default function DashboardPage() {
   }, [page, riskFilter, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load summary stats once on mount
+  useEffect(() => {
+    Promise.all([
+      listScans(1, 1),
+      listScans(1, 1, "critical"),
+      listScans(1, 1, "high"),
+      listScans(1, 1, "medium"),
+      listScans(1, 1, "low"),
+    ]).then(([all, crit, high, med, low]) => {
+      setStats({
+        total: all.total,
+        critical: crit.total,
+        high: high.total,
+        medium: med.total,
+        low: low.total,
+      });
+    }).catch(() => {});
+  }, []);
 
   async function handleDelete(scan: Scan) {
     if (!confirm(`Delete scan for "${scan.filename}"?`)) return;
@@ -68,6 +99,16 @@ export default function DashboardPage() {
           <span className="text-base">+</span> New Scan
         </Link>
       </div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <StatCard label="Total Scans" value={stats.total} color="border-slate-200" />
+          <StatCard label="Critical + High" value={stats.critical + stats.high} color="border-red-200" />
+          <StatCard label="Medium" value={stats.medium} color="border-yellow-200" />
+          <StatCard label="Low / Info" value={stats.low} color="border-green-200" />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-4">

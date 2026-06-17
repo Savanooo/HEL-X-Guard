@@ -11,6 +11,9 @@ W_SHELL_COMMAND = 5    # per shell command string
 CAP_SHELL_CMD   = 15
 W_DEBUG_KEYWORD = 10   # per debug/backdoor keyword
 CAP_DEBUG       = 20
+W_CRYPTO        = 8    # per weak crypto identifier (MD5, DES, RC4 etc.)
+CAP_CRYPTO      = 16
+W_VERSION       = 0    # version strings are informational only
 
 YARA_WEIGHTS: dict[str, int] = {
     "critical": 40,
@@ -101,6 +104,16 @@ def score(
         contrib = min(debug_count * W_DEBUG_KEYWORD, CAP_DEBUG)
         total += contrib
         reasons.append(f"Debug/backdoor keywords found ({debug_count})")
+
+    crypto_count = categories.get("CRYPTO", 0)
+    if crypto_count > 0:
+        contrib = min(crypto_count * W_CRYPTO, CAP_CRYPTO)
+        total += contrib
+        reasons.append(f"Weak/deprecated cryptographic algorithm identifier(s) found ({crypto_count})")
+
+    version_count = categories.get("VERSION", 0)
+    if version_count > 0:
+        reasons.append(f"Firmware version string(s) found ({version_count})")
 
     # ── YARA matches ─────────────────────────────────────────
     for match in yara_result.get("matches", []):
