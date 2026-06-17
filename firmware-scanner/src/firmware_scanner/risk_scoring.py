@@ -14,6 +14,10 @@ CAP_DEBUG       = 50   # raised: multiple safety-bypass flags each deserve contr
 W_CRYPTO        = 8    # per weak crypto identifier (MD5, DES, RC4 etc.)
 CAP_CRYPTO      = 16
 W_VERSION       = 0    # version strings are informational only
+W_SAFETY_BYPASS = 20   # per safety-bypass flag (medical/embedded critical risk)
+CAP_SAFETY      = 60
+W_FLASH_WRITE   = 12   # per flash write/erase string
+CAP_FLASH       = 24
 
 YARA_WEIGHTS: dict[str, int] = {
     "critical": 40,
@@ -114,6 +118,20 @@ def score(
     version_count = categories.get("VERSION", 0)
     if version_count > 0:
         reasons.append(f"Firmware version string(s) found ({version_count})")
+
+    safety_count = categories.get("SAFETY_BYPASS", 0)
+    if safety_count > 0:
+        contrib = min(safety_count * W_SAFETY_BYPASS, CAP_SAFETY)
+        total += contrib
+        reasons.append(
+            f"Safety-bypass or protection-disabled flag(s) found ({safety_count}) — patient-safety risk"
+        )
+
+    flash_count = categories.get("FLASH_WRITE", 0)
+    if flash_count > 0:
+        contrib = min(flash_count * W_FLASH_WRITE, CAP_FLASH)
+        total += contrib
+        reasons.append(f"Flash write/erase capability strings detected ({flash_count})")
 
     # ── YARA matches ─────────────────────────────────────────
     for match in yara_result.get("matches", []):

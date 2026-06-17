@@ -62,6 +62,19 @@ _PATTERNS: dict[str, re.Pattern] = {
         r'\b(?:MD5|SHA-?1\b|3DES|RC4|DES\b|ECB|AES-?128|AES-?256|RSA-?\d{3,4})\b',
         re.IGNORECASE,
     ),
+    # Medical/embedded safety-bypass flags — higher weight in risk_scoring
+    "SAFETY_BYPASS": re.compile(
+        r'\b(?:no_water_test|calibration_mode|no_safety|bypass_safety'
+        r'|disable_safety|skip_check|no_check|DISABLE_MPU|NO_MPU'
+        r'|NO_RDP|NO_RDP_CHECK|no_encrypt|TEST_BYPASS)\b',
+        re.IGNORECASE,
+    ),
+    # STM32 flash write/erase capability strings
+    "FLASH_WRITE": re.compile(
+        r'\b(?:XTXUNLOCK|XTXERASE|XTXCHIPERASE|FLASH_If_Write|FLASH_Unlock'
+        r'|xtx_program_page|xtx_erase_sector|flash_write|flash_erase)\b',
+        re.IGNORECASE,
+    ),
 }
 
 _CATEGORY_PRIORITY = [
@@ -73,6 +86,8 @@ _CATEGORY_PRIORITY = [
     "IP",
     "DOMAIN",
     "SHELL_COMMAND",
+    "SAFETY_BYPASS",
+    "FLASH_WRITE",
     "DEBUG_KEYWORD",
     "NETWORK_SERVICE",
     "CRYPTO",
