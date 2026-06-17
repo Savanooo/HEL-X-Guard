@@ -24,11 +24,35 @@ function fmtSize(bytes: number | null) {
   return `${(bytes / 1_048_576).toFixed(2)} MB`;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// Strip Python bytes notation b'...' and escape sequences for display
+function cleanYaraData(raw: string): string {
+  let s = raw.trim();
+  if (s.startsWith("b'") && s.endsWith("'")) s = s.slice(2, -1);
+  else if (s.startsWith('b"') && s.endsWith('"')) s = s.slice(2, -1);
+  // Replace non-printable escape sequences with hex
+  s = s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => {
+    const b = parseInt(h, 16);
+    return b >= 32 && b < 127 ? String.fromCharCode(b) : `\\x${h}`;
+  });
+  return s;
+}
+
+// Deduplicate YARA match strings (same identifier + same data)
+function dedupeStrings(arr: { identifier: string; data: string }[]) {
+  const seen = new Set<string>();
+  return arr.filter(s => {
+    const key = `${s.identifier}::${s.data}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function Section({ title, children, accent }: { title: string; children: React.ReactNode; accent?: string }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-        <h2 className="font-semibold text-slate-700 text-sm">{title}</h2>
+    <div className={`bg-white border rounded-xl overflow-hidden shadow-sm ${accent ? `border-l-4 ${accent} border-slate-200` : "border-slate-200"}`}>
+      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+        <h2 className="font-semibold text-slate-700 text-sm tracking-tight">{title}</h2>
       </div>
       <div className="p-5">{children}</div>
     </div>
@@ -37,11 +61,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function KV({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
-    <div className="flex gap-4 py-1.5">
-      <dt className="w-28 flex-shrink-0 text-xs font-medium text-slate-500 uppercase tracking-wide pt-0.5">
+    <div className="flex gap-4 py-2 border-b border-slate-50 last:border-0">
+      <dt className="w-24 flex-shrink-0 text-xs font-semibold text-slate-400 uppercase tracking-wider pt-0.5">
         {label}
       </dt>
-      <dd className={`flex-1 text-sm text-slate-800 break-all ${mono ? "font-mono text-xs" : ""}`}>
+      <dd className={`flex-1 text-sm text-slate-800 break-all ${mono ? "font-mono text-xs text-slate-600" : ""}`}>
         {value}
       </dd>
     </div>
@@ -229,36 +253,53 @@ export default function ScanDetailPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Risk card */}
-            <Section title="Risk Assessment">
-              <div className="flex items-center gap-6">
-                <RiskGauge
-                  score={scan.risk_score ?? 0}
-                  level={scan.risk_level ?? "informational"}
-                />
-                <div className="flex-1 min-w-0">
-                  <RiskBadge
-                    level={scan.risk_level ?? "informational"}
-                    score={scan.risk_score}
-                    large
-                  />
-                  {riskInfo.reasons?.length > 0 && (
-                    <ul className="mt-3 space-y-1">
-                      {riskInfo.reasons.map((r: string, i: number) => (
-                        <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
-                          <span className="text-slate-400 mt-0.5">•</span>
-                          {r}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+            <div className={`bg-white rounded-xl shadow-sm overflow-hidden border-2 ${
+              scan.risk_level === "critical" ? "border-red-500" :
+              scan.risk_level === "high"     ? "border-orange-400" :
+              scan.risk_level === "medium"   ? "border-yellow-400" :
+              scan.risk_level === "low"      ? "border-green-400" :
+                                               "border-slate-200"
+            }`}>
+              <div className={`px-5 py-3 border-b ${
+                scan.risk_level === "critical" ? "bg-red-50 border-red-100" :
+                scan.risk_level === "high"     ? "bg-orange-50 border-orange-100" :
+                scan.risk_level === "medium"   ? "bg-yellow-50 border-yellow-100" :
+                                                 "bg-slate-50 border-slate-100"
+              }`}>
+                <h2 className="font-semibold text-slate-700 text-sm tracking-tight">Risk Assessment</h2>
               </div>
-            </Section>
+              <div className="p-5">
+                <div className="flex items-center gap-5 mb-4">
+                  <RiskGauge score={scan.risk_score ?? 0} level={scan.risk_level ?? "informational"} />
+                  <div>
+                    <RiskBadge level={scan.risk_level ?? "informational"} score={scan.risk_score} large />
+                    <p className="text-xs text-slate-400 mt-1">
+                      {yaraMatches.length} YARA · {suspicious.length} strings
+                    </p>
+                  </div>
+                </div>
+                {riskInfo.reasons?.length > 0 && (
+                  <ul className="space-y-1.5 border-t border-slate-100 pt-3">
+                    {riskInfo.reasons.map((r: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
+                        <span className={`mt-0.5 text-base leading-none ${
+                          r.toLowerCase().includes("critical") || r.toLowerCase().includes("safety") || r.toLowerCase().includes("unsigned") ? "text-red-500" :
+                          r.toLowerCase().includes("high") || r.toLowerCase().includes("flash") || r.toLowerCase().includes("hidden") ? "text-orange-500" :
+                          r.toLowerCase().includes("medium") || r.toLowerCase().includes("debug") ? "text-yellow-500" :
+                          "text-slate-400"
+                        }`}>›</span>
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
 
             {/* File metadata */}
             <Section title="File Metadata">
-              <dl className="divide-y divide-slate-50">
-                <KV label="Name"    value={fileInfo.name} />
+              <dl>
+                <KV label="Name"    value={<span className="font-medium text-slate-700 truncate block max-w-xs">{fileInfo.name}</span>} />
                 <KV label="Size"    value={fmtSize(fileInfo.size?.bytes)} />
                 <KV label="Type"    value={fileInfo.type ?? "—"} />
                 <KV label="SHA-256" value={fileInfo.hashes?.sha256} mono />
@@ -266,13 +307,11 @@ export default function ScanDetailPage() {
                 <KV
                   label="Entropy"
                   value={
-                    <span>
-                      {(entropyInfo.overall ?? 0).toFixed(3)}{" "}
-                      <span className="text-slate-400 text-xs">/ 8.00</span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-semibold">{(entropyInfo.overall ?? 0).toFixed(3)}</span>
+                      <span className="text-slate-400">/ 8.00</span>
                       {entropyInfo.interpretation && (
-                        <span className="ml-2 text-slate-500 text-xs">
-                          — {entropyInfo.interpretation}
-                        </span>
+                        <span className="text-slate-400 text-xs">— {entropyInfo.interpretation}</span>
                       )}
                     </span>
                   }
@@ -284,27 +323,30 @@ export default function ScanDetailPage() {
 
           {/* Findings tabs */}
           <Section
-            title={`Findings  (${suspicious.length} strings · ${yaraMatches.length} YARA · ${binwalkFindings.length} binwalk)`}
+            title={`Findings — ${suspicious.length} strings · ${yaraMatches.length} YARA · ${binwalkFindings.length} binwalk`}
           >
             {/* Tab bar */}
-            <div className="flex gap-1 mb-4 border-b border-slate-100 pb-3">
+            <div className="flex gap-1 mb-5 border-b border-slate-100 pb-0">
               {(
                 [
-                  ["strings", `Strings (${suspicious.length})`],
-                  ["yara",    `YARA (${yaraMatches.length})`],
-                  ["binwalk", `Binwalk (${binwalkFindings.length})`],
-                ] as [typeof tab, string][]
-              ).map(([t, label]) => (
+                  ["strings", "Strings", suspicious.length],
+                  ["yara",    "YARA",    yaraMatches.length],
+                  ["binwalk", "Binwalk", binwalkFindings.length],
+                ] as [typeof tab, string, number][]
+              ).map(([t, label, count]) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                     tab === t
-                      ? "bg-blue-100 text-blue-700"
-                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                      ? "border-blue-600 text-blue-700"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
                   }`}
                 >
                   {label}
+                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                    tab === t ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+                  }`}>{count}</span>
                 </button>
               ))}
             </div>
@@ -312,30 +354,27 @@ export default function ScanDetailPage() {
             {/* Strings tab */}
             {tab === "strings" && (
               suspicious.length === 0 ? (
-                <p className="text-slate-400 text-sm">No suspicious strings found.</p>
+                <div className="text-center py-8 text-slate-400">
+                  <p className="text-2xl mb-2">✓</p>
+                  <p className="text-sm">No suspicious strings found.</p>
+                </div>
               ) : (
-                <div className="space-y-1 max-h-96 overflow-y-auto">
-                  {suspicious.slice(0, 100).map((s, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 py-1.5 border-b border-slate-50 last:border-0"
-                    >
-                      <span className="w-28 flex-shrink-0">
-                        <CategoryBadge cat={s.category} />
-                      </span>
-                      <span className="font-mono text-xs text-slate-700 break-all flex-1">
-                        {s.value.length > 120 ? s.value.slice(0, 120) + "…" : s.value}
-                      </span>
-                      <span className="text-xs text-slate-400 whitespace-nowrap">
-                        0x{s.offset.toString(16).padStart(6, "0")}
-                      </span>
-                    </div>
-                  ))}
-                  {suspicious.length > 100 && (
-                    <p className="text-xs text-slate-400 pt-2 text-center">
-                      … and {suspicious.length - 100} more findings
-                    </p>
-                  )}
+                <div className="rounded-lg border border-slate-100 overflow-hidden">
+                  <div className="max-h-[480px] overflow-y-auto divide-y divide-slate-50">
+                    {suspicious.map((s, i) => (
+                      <div key={i} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors">
+                        <span className="w-32 flex-shrink-0">
+                          <CategoryBadge cat={s.category} />
+                        </span>
+                        <span className="font-mono text-xs text-slate-700 break-all flex-1 leading-relaxed">
+                          {s.value.length > 140 ? s.value.slice(0, 140) + "…" : s.value}
+                        </span>
+                        <span className="text-xs text-slate-300 font-mono whitespace-nowrap">
+                          0x{s.offset.toString(16).padStart(6, "0")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )
             )}
@@ -343,26 +382,44 @@ export default function ScanDetailPage() {
             {/* YARA tab */}
             {tab === "yara" && (
               yaraMatches.length === 0 ? (
-                <p className="text-slate-400 text-sm">No YARA matches.</p>
+                <div className="text-center py-8 text-slate-400">
+                  <p className="text-2xl mb-2">✓</p>
+                  <p className="text-sm">No YARA rule matches detected.</p>
+                </div>
               ) : (
                 <div className="space-y-3">
-                  {yaraMatches.map((m, i) => (
-                    <div key={i} className="border border-slate-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-sm font-semibold text-slate-800">{m.rule}</span>
-                        {m.severity && <CategoryBadge cat={m.severity.toUpperCase()} />}
+                  {yaraMatches.map((m, i) => {
+                    const sev = (m.severity ?? "low").toLowerCase();
+                    const borderCls =
+                      sev === "critical" ? "border-l-red-500 bg-red-50/30" :
+                      sev === "high"     ? "border-l-orange-400 bg-orange-50/30" :
+                      sev === "medium"   ? "border-l-yellow-400 bg-yellow-50/20" :
+                                           "border-l-slate-300 bg-slate-50/30";
+                    const deduped = m.strings ? dedupeStrings(m.strings) : [];
+                    // Only show printable string matches, skip binary-only hits
+                    const printable = deduped.filter(s => {
+                      const cleaned = cleanYaraData(s.data);
+                      return !cleaned.startsWith("\\x") && cleaned.length > 0;
+                    });
+                    return (
+                      <div key={i} className={`border border-l-4 border-slate-200 rounded-lg p-4 ${borderCls}`}>
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <span className="font-semibold text-slate-900 text-sm">{m.rule}</span>
+                          {m.severity && <CategoryBadge cat={m.severity.toUpperCase()} />}
+                        </div>
+                        {printable.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {printable.map((s, j) => (
+                              <code key={j} className="inline-flex items-center gap-1 text-xs bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-700 font-mono shadow-sm">
+                                <span className="text-slate-400">{s.identifier}:</span>
+                                <span className="text-slate-800 font-semibold">{cleanYaraData(s.data)}</span>
+                              </code>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {m.strings && m.strings.length > 0 && (
-                        <ul className="mt-1 space-y-0.5">
-                          {m.strings.slice(0, 5).map((s, j) => (
-                            <li key={j} className="text-xs font-mono text-slate-500">
-                              {s.identifier}: {s.data}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )
             )}
@@ -664,28 +721,34 @@ function JobStatusPill({ status }: { status?: string | null }) {
 
 // ── Category badge ────────────────────────────────────────────────────────────
 
-const catStyles: Record<string, string> = {
-  PRIVATE_KEY:    "bg-red-100 text-red-700",
-  CERTIFICATE:    "bg-red-100 text-red-700",
-  API_KEY:        "bg-orange-100 text-orange-700",
-  CREDENTIAL:     "bg-orange-100 text-orange-700",
-  SHELL_COMMAND:  "bg-yellow-100 text-yellow-700",
-  DEBUG_KEYWORD:  "bg-yellow-100 text-yellow-700",
-  URL:            "bg-sky-100 text-sky-700",
-  IP:             "bg-sky-100 text-sky-700",
-  DOMAIN:         "bg-sky-100 text-sky-700",
-  NETWORK_SERVICE:"bg-sky-100 text-sky-700",
-  CRITICAL:       "bg-red-100 text-red-700",
-  HIGH:           "bg-orange-100 text-orange-700",
-  MEDIUM:         "bg-yellow-100 text-yellow-700",
-  LOW:            "bg-green-100 text-green-700",
+const catStyles: Record<string, { bg: string; label: string }> = {
+  PRIVATE_KEY:    { bg: "bg-red-600 text-white",         label: "PRIVATE KEY" },
+  CERTIFICATE:    { bg: "bg-red-500 text-white",         label: "CERTIFICATE" },
+  API_KEY:        { bg: "bg-orange-500 text-white",      label: "API KEY" },
+  CREDENTIAL:     { bg: "bg-orange-600 text-white",      label: "CREDENTIAL" },
+  SAFETY_BYPASS:  { bg: "bg-red-500 text-white",         label: "SAFETY BYPASS" },
+  FLASH_WRITE:    { bg: "bg-orange-500 text-white",      label: "FLASH WRITE" },
+  SHELL_COMMAND:  { bg: "bg-yellow-500 text-white",      label: "SHELL CMD" },
+  DEBUG_KEYWORD:  { bg: "bg-yellow-500 text-white",      label: "DEBUG" },
+  CRYPTO:         { bg: "bg-purple-500 text-white",      label: "CRYPTO" },
+  URL:            { bg: "bg-sky-500 text-white",         label: "URL" },
+  IP:             { bg: "bg-sky-500 text-white",         label: "IP" },
+  DOMAIN:         { bg: "bg-sky-500 text-white",         label: "DOMAIN" },
+  NETWORK_SERVICE:{ bg: "bg-sky-500 text-white",         label: "NETWORK" },
+  VERSION:        { bg: "bg-slate-400 text-white",       label: "VERSION" },
+  CRITICAL:       { bg: "bg-red-600 text-white",         label: "CRITICAL" },
+  HIGH:           { bg: "bg-orange-500 text-white",      label: "HIGH" },
+  MEDIUM:         { bg: "bg-yellow-500 text-white",      label: "MEDIUM" },
+  LOW:            { bg: "bg-green-500 text-white",       label: "LOW" },
 };
 
 function CategoryBadge({ cat }: { cat: string }) {
-  const cls = catStyles[cat] ?? "bg-slate-100 text-slate-600";
+  const style = catStyles[cat];
+  const cls   = style?.bg ?? "bg-slate-200 text-slate-600";
+  const label = style?.label ?? cat;
   return (
-    <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${cls}`}>
-      {cat}
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold tracking-wide ${cls}`}>
+      {label}
     </span>
   );
 }
