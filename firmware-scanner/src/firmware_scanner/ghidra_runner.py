@@ -59,6 +59,17 @@ def is_available() -> bool:
     return _analyzer_path(Path(ghidra_home)).exists()
 
 
+def _detect_format(path: Path) -> str | None:
+    """Return 'ELF', 'PE', or None for unrecognized raw binaries."""
+    with open(path, "rb") as f:
+        magic = f.read(4)
+    if magic[:4] == b"\x7fELF":
+        return "ELF"
+    if magic[:2] == b"MZ":
+        return "PE"
+    return None
+
+
 def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> dict:
     """Run Ghidra headless analysis and return decompiled pseudocode per function.
 
@@ -72,6 +83,18 @@ def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> d
         return {
             "available": False,
             "error": "Ghidra not configured. Set GHIDRA_HOME to enable decompilation.",
+            "functions": [],
+        }
+
+    fmt = _detect_format(path)
+    if fmt is None:
+        return {
+            "available": True,
+            "error": (
+                "Unrecognized binary format (not ELF or PE). "
+                "Ghidra requires a known format or a processor specification. "
+                "Raw firmware images (flash dumps, custom formats) cannot be auto-decompiled."
+            ),
             "functions": [],
         }
 
