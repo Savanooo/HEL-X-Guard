@@ -448,9 +448,7 @@ export default function ScanDetailPage() {
                   <p className="text-xs text-slate-500 mt-2">⚠ {scan.decompile_error}</p>
                 )}
                 {scan.decompile?.functions && scan.decompile.functions.length > 0 && (
-                  <p className="text-xs text-slate-600 mt-3">
-                    {scan.decompile.functions.length} function(s) decompiled
-                  </p>
+                  <DecompileFunctions functions={scan.decompile.functions} />
                 )}
               </div>
             </div>
@@ -510,6 +508,49 @@ export default function ScanDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Decompile function list ───────────────────────────────────────────────────
+
+function DecompileFunctions({ functions }: { functions: { name: string; address: string; code: string }[] }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const filtered = functions.filter(f =>
+    f.name.toLowerCase().includes(search.toLowerCase())
+  );
+  return (
+    <div className="mt-3">
+      <p className="text-xs text-slate-600 mb-2 font-medium">{functions.length} function(s) decompiled</p>
+      <input
+        type="text"
+        placeholder="Filter functions…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs mb-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
+      />
+      <div className="max-h-64 overflow-y-auto space-y-1">
+        {filtered.slice(0, 100).map((fn, i) => (
+          <div key={i} className="border border-slate-100 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setOpen(open === i ? null : i)}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition-colors"
+            >
+              <span className="font-mono text-xs text-slate-800 truncate">{fn.name}</span>
+              <span className="text-xs text-slate-400 ml-2 flex-shrink-0">{fn.address}</span>
+            </button>
+            {open === i && (
+              <pre className="bg-slate-950 text-green-400 text-xs p-3 overflow-x-auto max-h-48 leading-relaxed whitespace-pre-wrap break-all">
+                {fn.code}
+              </pre>
+            )}
+          </div>
+        ))}
+        {filtered.length > 100 && (
+          <p className="text-xs text-slate-400 text-center pt-1">… and {filtered.length - 100} more</p>
+        )}
+      </div>
     </div>
   );
 }
