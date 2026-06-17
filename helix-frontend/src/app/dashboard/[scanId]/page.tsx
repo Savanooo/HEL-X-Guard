@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getScan, triggerExtract, triggerDecompile, downloadReportPdf, type Scan } from "@/lib/api";
 import RiskBadge from "@/components/RiskBadge";
