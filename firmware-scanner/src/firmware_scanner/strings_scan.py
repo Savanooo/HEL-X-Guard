@@ -62,19 +62,31 @@ _CATEGORY_PRIORITY = [
 ]
 
 
-def _is_repetitive(s: str, max_period: int = 4, threshold: float = 0.80) -> bool:
+def _is_repetitive(s: str, max_period: int = 4, threshold: float = 0.85) -> bool:
     """Detect ARM/machine-code byte patterns that appear as repetitive ASCII strings.
 
-    e.g. 'MkMkMkMkMk', 'BBJBJBJB', 'snkmkmkm' — all have a short repeating unit.
-    Real API keys/credentials are pseudo-random and won't pass this check.
+    Two-stage filter:
+    1. Low character diversity (≤4 unique chars in a long string) → machine code.
+    2. Short repeating unit, allowing a few irregular chars at the start.
+
+    Real API keys, JWTs, hex hashes are pseudo-random and have diverse chars.
+    Machine code byte sequences (e.g. 'MkMkMk', 'BBJBJB', 'cMkMkMk') do not.
     """
     n = len(s)
-    if n < 12:
+    if n < 16:
         return False
-    for period in range(1, min(max_period + 1, n // 2 + 1)):
-        matches = sum(s[i] == s[i % period] for i in range(n))
-        if matches / n >= threshold:
-            return True
+    # Stage 1: very few unique characters → almost certainly machine-code artifact
+    if len(set(s)) <= 4:
+        return True
+    # Stage 2: repeating unit check, with small skip to handle non-repeating prefix
+    max_skip = min(6, n // 4)
+    for skip in range(max_skip + 1):
+        body = s[skip:]
+        nb = len(body)
+        for period in range(1, min(max_period + 1, nb // 2 + 1)):
+            matches = sum(body[i] == body[i % period] for i in range(nb))
+            if matches / nb >= threshold:
+                return True
     return False
 
 
