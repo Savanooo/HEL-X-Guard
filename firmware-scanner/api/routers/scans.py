@@ -14,7 +14,7 @@ from ..auth import require_analyst, require_viewer
 from ..database import get_db
 from ..models import Scan, User
 from ..runner import dispatch_decompile, dispatch_extraction, dispatch_scan
-from ..schemas import DecompileRequest, ScanDetailResponse, ScanListResponse, ScanResponse
+from ..schemas import DecompileRequest, ScanDetailResponse, ScanDiffResponse, ScanListResponse, ScanResponse
 from .. import storage
 
 router = APIRouter(prefix="/api/v1/scans", tags=["scans"])
@@ -315,6 +315,102 @@ def trigger_decompile(
                        processor=body.processor,
                        base_address=body.base_address)
     return _to_detail(scan)
+
+
+@router.get(
+    "/{scan_id_a}/diff/{scan_id_b}",
+    response_model=ScanDiffResponse,
+    summary="Compare two completed scans — strings, YARA, risk delta",
+)
+def diff_scans(
+    scan_id_a: str,
+    scan_id_b: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_viewer),
+) -> dict:
+    scan_a = _get_scan(scan_id_a, current_user, db, request=request, action="diff_scan")
+    scan_b = _get_scan(scan_id_b, current_user, db, request=request, action="diff_scan")
+
+    for s in (scan_a, scan_b):
+        if s.status != "completed":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Scan {s.id} ({s.filename}) is not completed",
+            )
+        if not s.report_json:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No report available for scan {s.id}",
+            )
+
+    report_a = json.loads(scan_a.report_json)
+    report_b = json.loads(scan_b.report_json)
+
+    # ── String diff (by value + category key) ─────────────────────────────
+    def _string_map(report: dict) -> dict[tuple[str, str], dict]:
+        return {
+            (s["value"], s["category"]): s
+            for s in report.get("strings", {}).get("suspicious", [])
+        }
+
+    smap_a = _string_map(report_a)
+    smap_b = _string_map(report_b)
+    keys_added   = set(smap_b) - set(smap_a)
+    keys_removed = set(smap_a) - set(smap_b)
+
+    strings_added   = sorted([smap_b[k] for k in keys_added],   key=lambda x: x.get("category", ""))
+    strings_removed = sorted([smap_a[k] for k in keys_removed], key=lambda x: x.get("category", ""))
+
+    # ── YARA diff (by rule name) ───────────────────────────────────────────
+    def _yara_map(report: dict) -> dict[str, dict]:
+        return {m["rule"]: m for m in report.get("yara", {}).get("matches", [])}
+
+    ymap_a = _yara_map(report_a)
+    ymap_b = _yara_map(report_b)
+    yara_new      = [ymap_b[r] for r in ymap_b if r not in ymap_a]
+    yara_resolved = [ymap_a[r] for r in ymap_a if r not in ymap_b]
+
+    # ── Numeric deltas ─────────────────────────────────────────────────────
+    risk_a    = float(report_a.get("risk", {}).get("score", 0))
+    risk_b    = float(report_b.get("risk", {}).get("score", 0))
+    entropy_a = float(report_a.get("entropy", {}).get("overall", 0))
+    entropy_b = float(report_b.get("entropy", {}).get("overall", 0))
+    size_delta = (
+        (scan_b.file_size - scan_a.file_size)
+        if scan_a.file_size is not None and scan_b.file_size is not None
+        else None
+    )
+
+    return {
+        "scan_a": {
+            "id": scan_a.id, "filename": scan_a.filename,
+            "risk_score": risk_a, "risk_level": scan_a.risk_level,
+            "created_at": scan_a.created_at, "entropy": entropy_a,
+            "file_size": scan_a.file_size,
+            "suspicious_count": len(smap_a), "yara_count": len(ymap_a),
+        },
+        "scan_b": {
+            "id": scan_b.id, "filename": scan_b.filename,
+            "risk_score": risk_b, "risk_level": scan_b.risk_level,
+            "created_at": scan_b.created_at, "entropy": entropy_b,
+            "file_size": scan_b.file_size,
+            "suspicious_count": len(smap_b), "yara_count": len(ymap_b),
+        },
+        "summary": {
+            "risk_delta": round(risk_b - risk_a, 1),
+            "entropy_delta": round(entropy_b - entropy_a, 4),
+            "file_size_delta": size_delta,
+            "strings_added": len(strings_added),
+            "strings_removed": len(strings_removed),
+            "yara_new": len(yara_new),
+            "yara_resolved": len(yara_resolved),
+        },
+        "strings_added":   strings_added[:300],
+        "strings_removed": strings_removed[:300],
+        "yara_new":        yara_new,
+        "yara_resolved":   yara_resolved,
+    }
 
 
 @router.delete(

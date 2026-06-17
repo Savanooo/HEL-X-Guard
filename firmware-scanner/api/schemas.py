@@ -72,6 +72,40 @@ class ScanListResponse(BaseModel):
     page_size: int
 
 
+# ── Diff ──────────────────────────────────────────────────────────────────────
+
+class DiffScanMeta(BaseModel):
+    id: str
+    filename: str
+    risk_score: float | None
+    risk_level: str | None
+    created_at: datetime
+    entropy: float | None
+    file_size: int | None
+    suspicious_count: int
+    yara_count: int
+
+
+class DiffSummary(BaseModel):
+    risk_delta: float
+    entropy_delta: float
+    file_size_delta: int | None
+    strings_added: int
+    strings_removed: int
+    yara_new: int
+    yara_resolved: int
+
+
+class ScanDiffResponse(BaseModel):
+    scan_a: DiffScanMeta
+    scan_b: DiffScanMeta
+    summary: DiffSummary
+    strings_added: list[dict[str, Any]]
+    strings_removed: list[dict[str, Any]]
+    yara_new: list[dict[str, Any]]
+    yara_resolved: list[dict[str, Any]]
+
+
 # ── Audit ─────────────────────────────────────────────────────────────────────
 
 class AuditLogResponse(BaseModel):

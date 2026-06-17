@@ -17,10 +17,14 @@ function IconUsers() {
 function IconShield() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 }
+function IconDiff() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
+}
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard":        "Scan History",
   "/dashboard/upload": "New Scan",
+  "/dashboard/diff":   "Firmware Compare",
   "/dashboard/users":  "User Management",
   "/dashboard/audit":  "Audit Log",
 };
@@ -48,6 +52,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const mainLinks = [
     { href: "/dashboard",        label: "Scans",    Icon: IconScans  },
     { href: "/dashboard/upload", label: "New Scan", Icon: IconUpload },
+    { href: "/dashboard/diff",   label: "Compare",  Icon: IconDiff   },
   ];
   const adminLinks = user.role === "admin" ? [
     { href: "/dashboard/users", label: "Users",     Icon: IconUsers  },

@@ -193,6 +193,47 @@ export async function downloadReportPdf(id: string, suggestedName: string): Prom
   URL.revokeObjectURL(url);
 }
 
+// ── Diff ──────────────────────────────────────────────────────────────────────
+
+export interface DiffScanMeta {
+  id: string;
+  filename: string;
+  risk_score: number | null;
+  risk_level: string | null;
+  created_at: string;
+  entropy: number | null;
+  file_size: number | null;
+  suspicious_count: number;
+  yara_count: number;
+}
+
+export interface DiffSummary {
+  risk_delta: number;
+  entropy_delta: number;
+  file_size_delta: number | null;
+  strings_added: number;
+  strings_removed: number;
+  yara_new: number;
+  yara_resolved: number;
+}
+
+export interface ScanDiff {
+  scan_a: DiffScanMeta;
+  scan_b: DiffScanMeta;
+  summary: DiffSummary;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  strings_added: Record<string, any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  strings_removed: Record<string, any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  yara_new: Record<string, any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  yara_resolved: Record<string, any>[];
+}
+
+export const diffScans = (idA: string, idB: string) =>
+  req<ScanDiff>(`/api/v1/scans/${idA}/diff/${idB}`);
+
 // ── Audit ─────────────────────────────────────────────────────────────────────
 
 export const listAuditLog = (

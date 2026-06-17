@@ -79,7 +79,7 @@ export default function ScanDetailPage() {
   const router = useRouter();
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"strings" | "yara" | "binwalk">("strings");
+  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree">("strings");
   const [extractError, setExtractError] = useState("");
   const [decompileError, setDecompileError] = useState("");
   const [triggeringExtract, setTriggeringExtract] = useState(false);
@@ -211,16 +211,25 @@ export default function ScanDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           {scan.status === "completed" && (
-            <button
-              onClick={handleDownloadPdf}
-              disabled={downloadingPdf}
-              className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
-            >
-              {downloadingPdf ? <Spinner size={13} /> : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-              )}
-              {downloadingPdf ? "Generating…" : "Download PDF"}
-            </button>
+            <>
+              <a
+                href={`/dashboard/diff?a=${scanId}`}
+                className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Compare
+              </a>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+                className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
+              >
+                {downloadingPdf ? <Spinner size={13} /> : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                )}
+                {downloadingPdf ? "Generating…" : "PDF"}
+              </button>
+            </>
           )}
           <StatusBadge status={scan.status} />
         </div>
@@ -329,7 +338,8 @@ export default function ScanDetailPage() {
                   ["strings", "Strings", suspicious.length],
                   ["yara",    "YARA",    yaraMatches.length],
                   ["binwalk", "Binwalk", binwalkFindings.length],
-                ] as [typeof tab, string, number][]
+                  ["tree",    "Pipeline Tree", null],
+                ] as [typeof tab, string, number | null][]
               ).map(([t, label, count]) => (
                 <button
                   key={t}
@@ -341,9 +351,11 @@ export default function ScanDetailPage() {
                   }`}
                 >
                   {label}
-                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                    tab === t ? "bg-blue-900/50 text-blue-400" : "bg-slate-800 text-slate-500"
-                  }`}>{count}</span>
+                  {count !== null && (
+                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                      tab === t ? "bg-blue-900/50 text-blue-400" : "bg-slate-800 text-slate-500"
+                    }`}>{count}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -442,6 +454,15 @@ export default function ScanDetailPage() {
                   ))}
                 </div>
               )
+            )}
+            {/* Pipeline Tree tab */}
+            {tab === "tree" && (
+              <PipelineTree
+                filename={scan.filename}
+                report={report}
+                riskScore={scan.risk_score ?? 0}
+                riskLevel={scan.risk_level ?? "informational"}
+              />
             )}
           </Section>
 
@@ -826,5 +847,234 @@ function CategoryBadge({ cat }: { cat: string }) {
     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold tracking-wide ${cls}`}>
       {label}
     </span>
+  );
+}
+
+// ── Pipeline Tree ─────────────────────────────────────────────────────────────
+
+interface TreeNodeProps {
+  icon: string;
+  label: string;
+  value?: string;
+  badge?: React.ReactNode;
+  children?: React.ReactNode;
+  defaultOpen?: boolean;
+  accent?: string;
+  last?: boolean;
+}
+
+function TreeNode({ icon, label, value, badge, children, defaultOpen = false, accent = "text-slate-400", last }: TreeNodeProps) {
+  const [open, setOpen] = useState(defaultOpen);
+  const hasChildren = !!children;
+  return (
+    <div className="relative">
+      {/* Connector line */}
+      {!last && (
+        <span className="absolute left-3.5 top-7 bottom-0 w-px bg-slate-700/40" />
+      )}
+      <div className="flex items-start gap-2.5">
+        {/* Toggle or leaf dot */}
+        {hasChildren ? (
+          <button
+            onClick={() => setOpen(o => !o)}
+            className="mt-1 w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/60 transition-colors border border-slate-700/40"
+          >
+            <svg className={`w-3 h-3 text-slate-500 transition-transform ${open ? "rotate-90" : ""}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+        ) : (
+          <div className="mt-1 w-7 h-7 flex-shrink-0 flex items-center justify-center">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 py-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-base leading-none">{icon}</span>
+            <span className={`text-xs font-semibold ${accent}`}>{label}</span>
+            {value && <span className="text-xs text-slate-400 font-mono">{value}</span>}
+            {badge}
+          </div>
+        </div>
+      </div>
+
+      {/* Children */}
+      {hasChildren && open && (
+        <div className="ml-7 mt-1 space-y-0.5 border-l border-slate-700/40 pl-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TreeLeaf({ icon, label, value, accent = "text-slate-500" }: {
+  icon: string; label: string; value?: string; accent?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 py-0.5 pl-1">
+      <span className="text-sm leading-none opacity-70">{icon}</span>
+      <span className={`text-xs font-medium ${accent}`}>{label}</span>
+      {value && <span className="text-xs text-slate-500 font-mono truncate">{value}</span>}
+    </div>
+  );
+}
+
+function PipelineTree({
+  filename, report, riskScore, riskLevel,
+}: {
+  filename: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  report: Record<string, any> | null;
+  riskScore: number;
+  riskLevel: string;
+}) {
+  if (!report) return <p className="text-slate-500 text-sm text-center py-8">No report data.</p>;
+
+  const hashes      = report.file?.hashes ?? {};
+  const entropy     = report.entropy ?? {};
+  const stringsR    = report.strings ?? {};
+  const yaraR       = report.yara ?? {};
+  const binwalkR    = report.binwalk ?? {};
+  const riskR       = report.risk ?? {};
+
+  // Group suspicious strings by category
+  const byCategory: Record<string, { value: string; offset: number }[]> = {};
+  for (const s of (stringsR.suspicious ?? [])) {
+    if (!byCategory[s.category]) byCategory[s.category] = [];
+    byCategory[s.category].push(s);
+  }
+
+  const catOrder = ["SAFETY_BYPASS", "PRIVATE_KEY", "CERTIFICATE", "API_KEY", "CREDENTIAL",
+    "FLASH_WRITE", "SHELL_COMMAND", "DEBUG_KEYWORD", "CRYPTO", "URL", "IP", "DOMAIN",
+    "NETWORK_SERVICE", "VERSION"];
+
+  const riskAccent =
+    riskLevel === "critical" ? "text-red-400" :
+    riskLevel === "high"     ? "text-orange-400" :
+    riskLevel === "medium"   ? "text-yellow-400" :
+    riskLevel === "low"      ? "text-green-400"  : "text-slate-400";
+
+  return (
+    <div className="space-y-0.5 font-mono text-xs select-none">
+      {/* Root */}
+      <TreeNode icon="📦" label={filename} accent="text-white" defaultOpen>
+        {/* Hashing */}
+        <TreeNode icon="🔐" label="Hashing" accent="text-slate-300" defaultOpen last={false}>
+          <TreeLeaf icon="›" label="SHA256" value={hashes.sha256 ? `${hashes.sha256.slice(0, 20)}…` : "—"} />
+          <TreeLeaf icon="›" label="MD5" value={hashes.md5 ?? "—"} />
+          <TreeLeaf icon="›" label="SHA1" value={hashes.sha1 ? `${hashes.sha1.slice(0, 16)}…` : "—"} />
+        </TreeNode>
+
+        {/* Entropy */}
+        <TreeNode
+          icon="📊"
+          label="Entropy Analysis"
+          value={`${(entropy.overall ?? 0).toFixed(3)} / 8.000`}
+          accent={entropy.overall > 7.5 ? "text-red-400" : entropy.overall > 6 ? "text-yellow-400" : "text-slate-300"}
+          defaultOpen={entropy.overall > 7.5}
+          last={false}
+        >
+          <TreeLeaf icon="›" label="Interpretation" value={entropy.interpretation ?? "—"} />
+          <TreeLeaf icon="›" label="Blocks analyzed" value={String(entropy.blocks?.length ?? 0)} />
+          {entropy.overall > 7.5 && (
+            <TreeLeaf icon="⚠" label="High entropy detected — possible encryption/compression" accent="text-red-400" />
+          )}
+        </TreeNode>
+
+        {/* Strings */}
+        <TreeNode
+          icon="🔍"
+          label="String Extraction"
+          value={`${stringsR.total ?? 0} total · ${stringsR.suspicious_count ?? 0} suspicious`}
+          accent="text-slate-300"
+          defaultOpen={(stringsR.suspicious_count ?? 0) > 0}
+          last={false}
+        >
+          {catOrder.map(cat => {
+            const items = byCategory[cat];
+            if (!items?.length) return null;
+            const catAccent = cat === "SAFETY_BYPASS" || cat === "PRIVATE_KEY" ? "text-red-400"
+              : cat === "FLASH_WRITE" || cat === "API_KEY" || cat === "CREDENTIAL" ? "text-orange-400"
+              : cat === "DEBUG_KEYWORD" || cat === "SHELL_COMMAND" ? "text-yellow-400"
+              : cat === "CRYPTO" ? "text-purple-400" : "text-slate-400";
+            const catLabel = catStyles[cat]?.label ?? cat;
+            return (
+              <TreeNode key={cat} icon="›" label={catLabel} value={`(${items.length})`} accent={catAccent}>
+                {items.slice(0, 8).map((s, i) => (
+                  <TreeLeaf key={i} icon="·"
+                    label={s.value.length > 60 ? s.value.slice(0, 60) + "…" : s.value}
+                    value={`@ 0x${s.offset.toString(16).padStart(6, "0")}`}
+                    accent="text-slate-400"
+                  />
+                ))}
+                {items.length > 8 && (
+                  <TreeLeaf icon="·" label={`…${items.length - 8} more`} accent="text-slate-600" />
+                )}
+              </TreeNode>
+            );
+          })}
+          {(stringsR.suspicious_count ?? 0) === 0 && (
+            <TreeLeaf icon="✓" label="No suspicious strings found" accent="text-emerald-500" />
+          )}
+        </TreeNode>
+
+        {/* YARA */}
+        <TreeNode
+          icon="🎯"
+          label="YARA Matching"
+          value={`${(yaraR.matches ?? []).length} match${(yaraR.matches ?? []).length !== 1 ? "es" : ""}`}
+          accent={(yaraR.matches ?? []).length > 0 ? "text-orange-400" : "text-slate-300"}
+          defaultOpen={(yaraR.matches ?? []).length > 0}
+          last={false}
+        >
+          {(yaraR.matches ?? []).map((m: { rule: string; severity?: string }, i: number) => {
+            const sevAccent = m.severity === "critical" ? "text-red-400"
+              : m.severity === "high" ? "text-orange-400"
+              : m.severity === "medium" ? "text-yellow-400" : "text-slate-400";
+            return (
+              <TreeLeaf key={i} icon="›" label={m.rule} value={`[${(m.severity ?? "low").toUpperCase()}]`} accent={sevAccent} />
+            );
+          })}
+          {(yaraR.matches ?? []).length === 0 && (
+            <TreeLeaf icon="✓" label="No YARA rule matches" accent="text-emerald-500" />
+          )}
+          {yaraR.error && <TreeLeaf icon="⚠" label={yaraR.error} accent="text-slate-500" />}
+        </TreeNode>
+
+        {/* Binwalk */}
+        <TreeNode
+          icon="🛸"
+          label="Binwalk Signatures"
+          value={`${(binwalkR.findings ?? []).length} signature${(binwalkR.findings ?? []).length !== 1 ? "s" : ""}`}
+          accent="text-slate-300"
+          last={false}
+        >
+          {(binwalkR.findings ?? []).length === 0 ? (
+            <TreeLeaf icon="›" label="No embedded signatures — bare-metal MCU firmware (expected)" accent="text-slate-500" />
+          ) : (binwalkR.findings ?? []).map((f: { description: string; offset: number }, i: number) => (
+            <TreeLeaf key={i} icon="›" label={f.description} value={`@ 0x${f.offset.toString(16).padStart(6, "0")}`} />
+          ))}
+          {binwalkR.error && <TreeLeaf icon="⚠" label={`Binwalk error: ${binwalkR.error}`} accent="text-slate-500" />}
+        </TreeNode>
+
+        {/* Risk Score */}
+        <TreeNode
+          icon="⚖️"
+          label="Risk Score"
+          value={`${Math.round(riskScore)} / 100`}
+          accent={riskAccent}
+          defaultOpen
+          last
+        >
+          {(riskR.reasons ?? []).map((r: string, i: number) => (
+            <TreeLeaf key={i} icon="›" label={r} accent="text-slate-400" />
+          ))}
+        </TreeNode>
+      </TreeNode>
+    </div>
   );
 }
