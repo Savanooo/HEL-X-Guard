@@ -447,59 +447,66 @@ export default function ScanDetailPage() {
 
           {/* Deep analysis: extract / decompile */}
           <Section title="Deep Analysis">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Extraction */}
-              <div className="border border-slate-700/50 rounded-lg p-4" style={{ background: "rgba(15,21,32,0.5)" }}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-semibold text-sm text-slate-200">Binwalk Extraction</p>
-                  <JobStatusPill status={scan.extraction_status} />
+            {/* Action bar — horizontal rows */}
+            <div className="space-y-2 mb-5">
+              {/* Binwalk row */}
+              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "rgba(13,17,23,0.5)" }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-200">Binwalk Extraction</p>
+                    <JobStatusPill status={scan.extraction_status} />
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">Extracts embedded filesystems — listed only, never executed.</p>
+                  {extractError && <p className="text-xs text-red-400 mt-1">{extractError}</p>}
+                  {scan.extraction_error && <p className="text-xs text-slate-500 mt-1">⚠ {scan.extraction_error}</p>}
                 </div>
-                <p className="text-xs text-slate-500 mb-3">
-                  Extracts embedded filesystems/files for inspection. Extracted files are listed only — never executed.
-                </p>
                 <button
                   onClick={handleExtract}
                   disabled={triggeringExtract || scan.extraction_status === "pending" || scan.extraction_status === "running"}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors flex-shrink-0"
                 >
                   {triggeringExtract && <Spinner size={12} />}
-                  {scan.extraction_status ? "Re-run Extraction" : "Run Extraction"}
+                  {scan.extraction_status ? "Re-run" : "Run Extraction"}
                 </button>
-                {extractError && <p className="text-xs text-red-400 mt-2">{extractError}</p>}
-                {scan.extraction_error && (
-                  <p className="text-xs text-slate-500 mt-2">⚠ {scan.extraction_error}</p>
-                )}
-                {scan.extraction_status === "completed" && scan.extraction && (
-                  <ExtractionResults extraction={scan.extraction} />
-                )}
               </div>
 
-              {/* Decompile */}
-              <div className="border border-slate-700/50 rounded-lg p-4" style={{ background: "rgba(15,21,32,0.5)" }}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-semibold text-sm text-slate-200">Ghidra Decompile</p>
-                  <JobStatusPill status={scan.decompile_status} />
+              {/* Ghidra row */}
+              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "rgba(13,17,23,0.5)" }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-200">Ghidra Decompile</p>
+                    <JobStatusPill status={scan.decompile_status} />
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">Static disassembly — never executes. Requires Ghidra on server.</p>
+                  {decompileError && <p className="text-xs text-red-400 mt-1">{decompileError}</p>}
+                  {scan.decompile_error && <p className="text-xs text-slate-500 mt-1">⚠ {scan.decompile_error}</p>}
                 </div>
-                <p className="text-xs text-slate-500 mb-3">
-                  Optional, heavy. Statically disassembles the binary — never executes it. Requires Ghidra configured on the server.
-                </p>
                 <button
                   onClick={() => setShowProcessorModal(true)}
                   disabled={triggeringDecompile || scan.decompile_status === "pending" || scan.decompile_status === "running"}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors flex-shrink-0"
                 >
                   {triggeringDecompile && <Spinner size={12} />}
-                  {scan.decompile_status ? "Re-run Decompile" : "Run Decompile"}
+                  {scan.decompile_status ? "Re-run" : "Run Decompile"}
                 </button>
-                {decompileError && <p className="text-xs text-red-400 mt-2">{decompileError}</p>}
-                {scan.decompile_error && (
-                  <p className="text-xs text-slate-500 mt-2">⚠ {scan.decompile_error}</p>
-                )}
-                {scan.decompile?.functions && scan.decompile.functions.length > 0 && (
-                  <DecompileFunctions functions={scan.decompile.functions} />
-                )}
               </div>
             </div>
+
+            {/* Extraction results — full width */}
+            {scan.extraction_status === "completed" && scan.extraction && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Extraction Results</p>
+                <ExtractionResults extraction={scan.extraction} />
+              </div>
+            )}
+
+            {/* Decompile tree — full width */}
+            {scan.decompile?.functions && scan.decompile.functions.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Decompiled Functions</p>
+                <DecompileFunctions functions={scan.decompile.functions} />
+              </div>
+            )}
           </Section>
         </>
       )}
@@ -627,68 +634,142 @@ function ExtractionResults({ extraction }: { extraction: Record<string, unknown>
   );
 }
 
-// ── Decompile function list ───────────────────────────────────────────────────
+// ── Decompile function tree ───────────────────────────────────────────────────
 
-function DecompileFunctions({ functions }: { functions: { name: string; address: string; code: string }[] }) {
-  const [open, setOpen] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
+type FnEntry = { name: string; address: string; code: string };
+
+function groupByBlock(fns: FnEntry[], blockSize = 0x1000) {
+  const map = new Map<number, FnEntry[]>();
+  for (const fn of fns) {
+    const addr = parseInt(fn.address, 16) || 0;
+    const blockStart = Math.floor(addr / blockSize) * blockSize;
+    if (!map.has(blockStart)) map.set(blockStart, []);
+    map.get(blockStart)!.push(fn);
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([start, items]) => ({
+      key:   `0x${start.toString(16).padStart(8, "0")}`,
+      range: `0x${start.toString(16).padStart(8, "0")} – 0x${(start + blockSize - 1).toString(16).padStart(8, "0")}`,
+      items,
+    }));
+}
+
+function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
+  const [openFn, setOpenFn]         = useState<string | null>(null);
+  const [search, setSearch]         = useState("");
   const [searchCode, setSearchCode] = useState(false);
-  const q = search.toLowerCase();
+
+  const q        = search.toLowerCase();
   const filtered = q
-    ? functions.filter(f =>
-        f.name.toLowerCase().includes(q) ||
-        (searchCode && f.code.toLowerCase().includes(q))
-      )
+    ? functions.filter(f => f.name.toLowerCase().includes(q) || (searchCode && f.code.toLowerCase().includes(q)))
     : functions;
+  const groups   = groupByBlock(filtered);
+
+  function toggleGroup(key: string) {
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
   return (
-    <div className="mt-3">
-      <p className="text-xs text-slate-400 mb-2 font-medium">{functions.length} function(s) decompiled</p>
-      <div className="flex gap-2 items-center mb-2">
-        <input
-          type="text"
-          placeholder="Filter functions…"
-          value={search}
-          onChange={e => { setSearch(e.target.value); setOpen(null); }}
-          className="flex-1 border border-slate-700 bg-slate-900/60 text-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"
-        />
-        <label className="flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap cursor-pointer select-none">
+    <div>
+      {/* Search bar */}
+      <div className="flex gap-2 items-center mb-3">
+        <div className="relative flex-1">
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-600" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
-            type="checkbox"
-            checked={searchCode}
-            onChange={e => setSearchCode(e.target.checked)}
-            className="accent-blue-500"
+            type="text"
+            placeholder={`Search ${functions.length} functions…`}
+            value={search}
+            onChange={e => { setSearch(e.target.value); setOpenFn(null); }}
+            className="w-full border border-slate-700 bg-slate-900/60 text-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"
           />
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none whitespace-nowrap">
+          <input type="checkbox" checked={searchCode} onChange={e => setSearchCode(e.target.checked)} className="accent-blue-500" />
           search code
         </label>
+        {groups.length > 0 && (
+          <button
+            onClick={() => setOpenGroups(openGroups.size === groups.length ? new Set() : new Set(groups.map(g => g.key)))}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap"
+          >
+            {openGroups.size === groups.length ? "Collapse all" : "Expand all"}
+          </button>
+        )}
       </div>
+
       {search && (
-        <p className="text-xs text-slate-500 mb-1">
-          {filtered.length} match{filtered.length !== 1 ? "es" : ""}{searchCode ? " (name + code)" : " (name)"}
+        <p className="text-xs text-slate-500 mb-2">
+          {filtered.length} match{filtered.length !== 1 ? "es" : ""} across {groups.length} block{groups.length !== 1 ? "s" : ""}
+          {searchCode ? " (name + code)" : ""}
         </p>
       )}
-      <div className="max-h-96 overflow-y-auto space-y-1">
-        {filtered.map((fn, i) => (
-          <div key={i} className="border border-slate-700/40 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setOpen(open === i ? null : i)}
-              className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-800/50 transition-colors"
-            >
-              <span className="font-mono text-xs text-slate-200 truncate">{fn.name}</span>
-              <span className="text-xs text-slate-500 ml-2 flex-shrink-0">{fn.address}</span>
-            </button>
-            {open === i && (
-              <pre className="bg-slate-950 text-green-400 text-xs p-3 overflow-x-auto max-h-48 leading-relaxed whitespace-pre-wrap break-all">
-                {fn.code}
-              </pre>
-            )}
-          </div>
-        ))}
-        {filtered.length === 0 && search && (
-          <p className="text-xs text-slate-500 text-center py-4">
+
+      {/* Tree */}
+      <div className="border border-slate-700/40 rounded-lg overflow-hidden divide-y divide-slate-700/40">
+        {groups.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-8">
             No functions match &ldquo;{search}&rdquo;
-            {!searchCode && " — try enabling \"search code\""}
           </p>
-        )}
+        ) : groups.map(({ key, range, items }) => {
+          const isOpen = openGroups.has(key);
+          return (
+            <div key={key}>
+              {/* Group header */}
+              <button
+                onClick={() => toggleGroup(key)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-800/40 transition-colors"
+                style={{ background: "rgba(13,17,23,0.7)" }}
+              >
+                <svg
+                  className={`w-3 h-3 text-slate-500 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                >
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+                <span className="font-mono text-xs text-blue-400 font-semibold tracking-wide">{range}</span>
+                <span className="ml-auto text-xs text-slate-600 font-mono">{items.length} fn</span>
+              </button>
+
+              {/* Function rows */}
+              {isOpen && (
+                <div className="divide-y divide-slate-800/60">
+                  {items.map((fn, idx) => {
+                    const fnKey = `${key}:${idx}`;
+                    const isFnOpen = openFn === fnKey;
+                    return (
+                      <div key={fnKey}>
+                        <button
+                          onClick={() => setOpenFn(isFnOpen ? null : fnKey)}
+                          className="w-full flex items-center gap-3 pl-10 pr-4 py-2 text-left hover:bg-slate-800/30 transition-colors"
+                        >
+                          <svg
+                            className={`w-2.5 h-2.5 text-slate-600 transition-transform flex-shrink-0 ${isFnOpen ? "rotate-90" : ""}`}
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                          >
+                            <polyline points="9 18 15 12 9 6"/>
+                          </svg>
+                          <span className="font-mono text-xs text-slate-300 truncate flex-1 text-left">{fn.name}</span>
+                          <span className="font-mono text-xs text-slate-600 flex-shrink-0">{fn.address}</span>
+                        </button>
+                        {isFnOpen && (
+                          <pre className="bg-[#0a0f1a] text-green-400 text-xs pl-14 pr-4 py-3 overflow-x-auto max-h-72 leading-relaxed whitespace-pre-wrap break-all border-t border-slate-800/60">
+                            {fn.code}
+                          </pre>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
