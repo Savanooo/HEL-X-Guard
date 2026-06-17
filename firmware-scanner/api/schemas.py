@@ -32,6 +32,11 @@ class CreateUserRequest(BaseModel):
     role: str = "viewer"
 
 
+class DecompileRequest(BaseModel):
+    processor: str | None = None
+    base_address: str | None = None
+
+
 # ── Scans ─────────────────────────────────────────────────────────────────────
 
 class ScanResponse(BaseModel):

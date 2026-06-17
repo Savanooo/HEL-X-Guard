@@ -179,7 +179,9 @@ def start_extraction_thread(scan_id: str, stored_path: str) -> None:
 
 # ── Decompilation (optional, heavy) ───────────────────────────────────────────
 
-def _run_decompile(scan_id: str, stored_path: str) -> None:
+def _run_decompile(scan_id: str, stored_path: str,
+                   processor: str | None = None,
+                   base_address: str | None = None) -> None:
     db = SessionLocal()
     try:
         scan = db.get(Scan, scan_id)
@@ -194,7 +196,9 @@ def _run_decompile(scan_id: str, stored_path: str) -> None:
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
             out_dir = storage.get_output_dir(scan_id) / "decompiled"
-            result = ghidra_runner.decompile(local_path, out_dir)
+            result = ghidra_runner.decompile(local_path, out_dir,
+                                             processor=processor,
+                                             base_address=base_address)
         finally:
             storage.cleanup_temp(local_path, is_temp)
 
@@ -218,11 +222,13 @@ def _run_decompile(scan_id: str, stored_path: str) -> None:
         db.close()
 
 
-def start_decompile_thread(scan_id: str, stored_path: str) -> None:
+def start_decompile_thread(scan_id: str, stored_path: str,
+                           processor: str | None = None,
+                           base_address: str | None = None) -> None:
     """Spawn a daemon thread to run Ghidra headless decompilation."""
     t = threading.Thread(
         target=_run_decompile,
-        args=(scan_id, stored_path),
+        args=(scan_id, stored_path, processor, base_address),
         daemon=True,
         name=f"decompile-{scan_id[:8]}",
     )
@@ -252,9 +258,11 @@ def dispatch_extraction(scan_id: str, stored_path: str) -> None:
         start_extraction_thread(scan_id, stored_path)
 
 
-def dispatch_decompile(scan_id: str, stored_path: str) -> None:
+def dispatch_decompile(scan_id: str, stored_path: str,
+                       processor: str | None = None,
+                       base_address: str | None = None) -> None:
     if settings.use_celery:
         from .tasks import run_decompile_task
-        run_decompile_task.delay(scan_id, stored_path)
+        run_decompile_task.delay(scan_id, stored_path, processor, base_address)
     else:
-        start_decompile_thread(scan_id, stored_path)
+        start_decompile_thread(scan_id, stored_path, processor, base_address)

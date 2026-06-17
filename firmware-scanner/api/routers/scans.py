@@ -14,7 +14,7 @@ from ..auth import require_analyst, require_viewer
 from ..database import get_db
 from ..models import Scan, User
 from ..runner import dispatch_decompile, dispatch_extraction, dispatch_scan
-from ..schemas import ScanDetailResponse, ScanListResponse, ScanResponse
+from ..schemas import DecompileRequest, ScanDetailResponse, ScanListResponse, ScanResponse
 from .. import storage
 
 router = APIRouter(prefix="/api/v1/scans", tags=["scans"])
@@ -268,6 +268,7 @@ def trigger_extract(
 def trigger_decompile(
     scan_id: str,
     request: Request,
+    body: DecompileRequest = DecompileRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_analyst),
 ) -> ScanDetailResponse:
@@ -310,7 +311,9 @@ def trigger_decompile(
         resource_id=scan_id, request=request,
     )
 
-    dispatch_decompile(scan_id, scan.stored_path)
+    dispatch_decompile(scan_id, scan.stored_path,
+                       processor=body.processor,
+                       base_address=body.base_address)
     return _to_detail(scan)
 
 

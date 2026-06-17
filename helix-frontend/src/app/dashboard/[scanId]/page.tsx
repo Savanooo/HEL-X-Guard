@@ -60,6 +60,9 @@ export default function ScanDetailPage() {
   const [decompileError, setDecompileError] = useState("");
   const [triggeringExtract, setTriggeringExtract] = useState(false);
   const [triggeringDecompile, setTriggeringDecompile] = useState(false);
+  const [showProcessorModal, setShowProcessorModal] = useState(false);
+  const [selectedProcessor, setSelectedProcessor] = useState("ARM:LE:32:Cortex");
+  const [baseAddress, setBaseAddress] = useState("0x08000000");
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState("");
 
@@ -102,11 +105,12 @@ export default function ScanDetailPage() {
     }
   }
 
-  async function handleDecompile() {
+  async function handleDecompile(processor?: string, base_address?: string) {
     setDecompileError("");
+    setShowProcessorModal(false);
     setTriggeringDecompile(true);
     try {
-      const updated = await triggerDecompile(scanId);
+      const updated = await triggerDecompile(scanId, processor, base_address);
       setScan(updated);
     } catch (err) {
       setDecompileError(err instanceof Error ? err.message : "Failed to trigger decompilation");
@@ -432,7 +436,7 @@ export default function ScanDetailPage() {
                   Optional, heavy. Statically disassembles the binary — never executes it. Requires Ghidra configured on the server.
                 </p>
                 <button
-                  onClick={handleDecompile}
+                  onClick={() => setShowProcessorModal(true)}
                   disabled={triggeringDecompile || scan.decompile_status === "pending" || scan.decompile_status === "running"}
                   className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
                 >
@@ -452,6 +456,59 @@ export default function ScanDetailPage() {
             </div>
           </Section>
         </>
+      )}
+      {/* Processor selection modal */}
+      {showProcessorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-base font-semibold text-slate-900 mb-1">Ghidra Decompile Settings</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              For ELF/PE binaries, leave processor as Auto. For raw firmware (STM32, MIPS, etc.) select the CPU architecture.
+            </p>
+
+            <label className="block text-xs font-medium text-slate-700 mb-1">Processor Architecture</label>
+            <select
+              value={selectedProcessor}
+              onChange={e => setSelectedProcessor(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Auto (ELF / PE only)</option>
+              <option value="ARM:LE:32:Cortex">ARM Cortex-M LE 32-bit — STM32, NXP, etc.</option>
+              <option value="ARM:LE:32:v8">ARM v8 LE 32-bit</option>
+              <option value="ARM:BE:32:v8">ARM v8 BE 32-bit</option>
+              <option value="MIPS:LE:32:default">MIPS 32-bit Little-Endian</option>
+              <option value="MIPS:BE:32:default">MIPS 32-bit Big-Endian</option>
+              <option value="x86:LE:32:default">x86 32-bit</option>
+              <option value="x86:LE:64:default">x86-64</option>
+            </select>
+
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              Base Load Address <span className="text-slate-400 font-normal">(for raw binaries)</span>
+            </label>
+            <input
+              type="text"
+              value={baseAddress}
+              onChange={e => setBaseAddress(e.target.value)}
+              placeholder="e.g. 0x08000000"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono text-slate-800 mb-5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowProcessorModal(false)}
+                className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDecompile(selectedProcessor || undefined, baseAddress || undefined)}
+                className="px-4 py-2 text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors"
+              >
+                Run Decompile
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

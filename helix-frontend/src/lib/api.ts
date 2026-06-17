@@ -161,8 +161,15 @@ export const deleteScan = (id: string) =>
 export const triggerExtract = (id: string) =>
   req<Scan>(`/api/v1/scans/${id}/extract`, { method: "POST" });
 
-export const triggerDecompile = (id: string) =>
-  req<Scan>(`/api/v1/scans/${id}/decompile`, { method: "POST" });
+export const triggerDecompile = (
+  id: string,
+  processor?: string,
+  base_address?: string,
+) =>
+  req<Scan>(`/api/v1/scans/${id}/decompile`, {
+    method: "POST",
+    body: JSON.stringify({ processor: processor ?? null, base_address: base_address ?? null }),
+  });
 
 /** Downloads the PDF report. Uses fetch (not a plain <a href>) because the
  * endpoint requires a Bearer token, which anchor tags can't send. */

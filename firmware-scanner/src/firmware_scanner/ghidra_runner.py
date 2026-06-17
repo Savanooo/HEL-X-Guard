@@ -70,14 +70,32 @@ def _detect_format(path: Path) -> str | None:
     return None
 
 
-def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> dict:
+KNOWN_PROCESSORS = {
+    "ARM:LE:32:Cortex": "ARM Cortex-M (LE 32-bit) — STM32, NXP, etc.",
+    "ARM:LE:32:v8":     "ARM v8 (LE 32-bit)",
+    "ARM:BE:32:v8":     "ARM v8 (BE 32-bit)",
+    "MIPS:LE:32:default": "MIPS 32-bit Little-Endian",
+    "MIPS:BE:32:default": "MIPS 32-bit Big-Endian",
+    "x86:LE:32:default":  "x86 32-bit",
+    "x86:LE:64:default":  "x86-64",
+}
+
+
+def decompile(
+    path: Path,
+    output_dir: Path,
+    timeout: int = DEFAULT_TIMEOUT,
+    processor: str | None = None,
+    base_address: str | None = None,
+) -> dict:
     """Run Ghidra headless analysis and return decompiled pseudocode per function.
+
+    processor: Ghidra language ID (e.g. 'ARM:LE:32:Cortex'). Required for raw
+               binaries that Ghidra cannot auto-detect. ELF/PE are auto-detected.
+    base_address: hex load address string (e.g. '0x08000000') for raw binaries.
 
     Never raises. Returns {"available": False, ...} when Ghidra is not
     configured, or {"available": True, "error": str, ...} on any failure.
-
-    Returns:
-        {"available": bool, "error": str | None, "functions": list[dict]}
     """
     if not is_available():
         return {
@@ -87,13 +105,12 @@ def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> d
         }
 
     fmt = _detect_format(path)
-    if fmt is None:
+    if fmt is None and not processor:
         return {
             "available": True,
             "error": (
                 "Unrecognized binary format (not ELF or PE). "
-                "Ghidra requires a known format or a processor specification. "
-                "Raw firmware images (flash dumps, custom formats) cannot be auto-decompiled."
+                "Select a processor architecture to decompile raw firmware."
             ),
             "functions": [],
         }
@@ -113,6 +130,15 @@ def decompile(path: Path, output_dir: Path, timeout: int = DEFAULT_TIMEOUT) -> d
         cmd = [
             str(analyzer), str(project_dir), "helix_project",
             "-import", str(path),
+        ]
+
+        if processor:
+            cmd += ["-processor", processor, "-cspec", "default"]
+            if base_address:
+                cmd += ["-loader", "BinaryLoader",
+                        f"-loader-baseAddr={base_address}"]
+
+        cmd += [
             "-scriptPath", tmp,
             "-postScript", "ExportDecompiled.py",
             "-deleteProject",
