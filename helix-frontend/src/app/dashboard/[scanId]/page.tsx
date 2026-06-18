@@ -6,6 +6,7 @@ import RiskBadge from "@/components/RiskBadge";
 import RiskGauge from "@/components/RiskGauge";
 import StatusBadge from "@/components/StatusBadge";
 import Spinner from "@/components/Spinner";
+import PipelineTree, { type PipelineData, type Severity as PipelineSev } from "@/components/PipelineTree";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -456,13 +457,18 @@ export default function ScanDetailPage() {
               )
             )}
             {/* Pipeline Tree tab */}
-            {tab === "tree" && (
+            {tab === "tree" && report && (
               <PipelineTree
-                filename={scan.filename}
-                report={report}
-                riskScore={scan.risk_score ?? 0}
-                riskLevel={scan.risk_level ?? "informational"}
+                data={buildPipelineData(
+                  scan.filename,
+                  report,
+                  scan.risk_score ?? 0,
+                  scan.risk_level ?? "informational",
+                )}
               />
+            )}
+            {tab === "tree" && !report && (
+              <p className="text-slate-500 text-sm text-center py-8">No report data available.</p>
             )}
           </Section>
 
@@ -918,346 +924,131 @@ function CategoryBadge({ cat }: { cat: string }) {
   );
 }
 
-// ── Pipeline Tree ─────────────────────────────────────────────────────────────
+// ── Pipeline Tree adapter ─────────────────────────────────────────────────────
+// Converts the raw scan report JSON into the PipelineData shape the component expects.
 
-type PhaseAccent = "normal" | "ok" | "warn" | "danger";
-
-function PhaseSection({
-  num, icon, title, summary, accent = "normal", defaultOpen = false, children,
-}: {
-  num: string;
-  icon: React.ReactNode;
-  title: string;
-  summary: React.ReactNode;
-  accent?: PhaseAccent;
-  defaultOpen?: boolean;
-  children?: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  const borderCls =
-    accent === "danger" ? "border-l-red-500/70" :
-    accent === "warn"   ? "border-l-amber-500/60" :
-    accent === "ok"     ? "border-l-emerald-500/50" :
-                          "border-l-slate-700/40";
-
-  const numCls =
-    accent === "danger" ? "bg-red-500/10 text-red-400 ring-red-500/20" :
-    accent === "warn"   ? "bg-amber-500/10 text-amber-400 ring-amber-500/20" :
-    accent === "ok"     ? "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20" :
-                          "bg-slate-800/60 text-slate-500 ring-slate-700/30";
-
-  const iconCls =
-    accent === "danger" ? "text-red-400" :
-    accent === "warn"   ? "text-amber-400" :
-    accent === "ok"     ? "text-emerald-400" :
-                          "text-slate-500";
-
-  return (
-    <div className={`border-l-2 ${borderCls} rounded-r-xl overflow-hidden`} style={{ background: "#161b27" }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800/20 transition-colors group"
-      >
-        {/* Phase number */}
-        <span className={`text-[10px] font-bold font-mono rounded-md px-1.5 py-0.5 ring-1 flex-shrink-0 ${numCls}`}>
-          {num}
-        </span>
-        {/* Icon */}
-        <span className={`flex-shrink-0 ${iconCls}`}>{icon}</span>
-        {/* Title */}
-        <span className="text-sm font-semibold text-slate-200 flex-1 text-left">{title}</span>
-        {/* Summary */}
-        <span className="text-xs text-slate-500 font-mono mr-2 hidden sm:block">{summary}</span>
-        {/* Chevron */}
-        {children && (
-          <svg
-            className={`w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-all flex-shrink-0 ${open ? "rotate-90" : ""}`}
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          >
-            <polyline points="9 18 15 12 9 6"/>
-          </svg>
-        )}
-      </button>
-
-      {open && children && (
-        <div className="px-4 pb-3 border-t border-slate-800/40">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// SVG icon set for pipeline phases
-const PhaseIcons = {
-  hash: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/>
-      <line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
-    </svg>
-  ),
-  entropy: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-    </svg>
-  ),
-  strings: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-  ),
-  yara: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
-    </svg>
-  ),
-  binwalk: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-    </svg>
-  ),
-  risk: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-    </svg>
-  ),
+const CAT_LABELS: Record<string, string> = {
+  SAFETY_BYPASS: "Safety Bypass", PRIVATE_KEY: "Private Key", CERTIFICATE: "Certificate",
+  API_KEY: "API Key", CREDENTIAL: "Credential", FLASH_WRITE: "Flash Write",
+  SHELL_COMMAND: "Shell Command", DEBUG_KEYWORD: "Debug Keyword", CRYPTO: "Crypto",
+  URL: "URL", IP: "IP Address", DOMAIN: "Domain", NETWORK_SERVICE: "Network Service",
+  VERSION: "Version String",
+};
+const CAT_SEV: Record<string, PipelineSev> = {
+  SAFETY_BYPASS: "critical", PRIVATE_KEY: "critical", CERTIFICATE: "critical",
+  API_KEY: "high", CREDENTIAL: "high", FLASH_WRITE: "high",
+  SHELL_COMMAND: "medium", DEBUG_KEYWORD: "medium", CRYPTO: "medium",
+  URL: "low", IP: "low", DOMAIN: "low", NETWORK_SERVICE: "low", VERSION: "info",
 };
 
-function PipelineTree({
-  filename, report, riskScore, riskLevel,
-}: {
-  filename: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  report: Record<string, any> | null;
-  riskScore: number;
-  riskLevel: string;
-}) {
-  if (!report) return <p className="text-slate-500 text-sm text-center py-8">No report data.</p>;
+function normSev(s?: string | null): PipelineSev {
+  const l = (s ?? "").toLowerCase();
+  if (l === "critical") return "critical";
+  if (l === "high")     return "high";
+  if (l === "medium")   return "medium";
+  if (l === "low")      return "low";
+  if (l === "informational" || l === "info") return "info";
+  return "none";
+}
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildPipelineData(filename: string, report: Record<string, any>, riskScore: number, riskLevel: string): PipelineData {
   const hashes   = report.file?.hashes ?? {};
   const entropy  = report.entropy ?? {};
-  const stringsR = report.strings ?? {};
+  const strR     = report.strings ?? {};
   const yaraR    = report.yara ?? {};
   const binwalkR = report.binwalk ?? {};
   const riskR    = report.risk ?? {};
 
   // Group suspicious strings by category
-  const byCategory: Record<string, { value: string; offset: number }[]> = {};
-  for (const s of (stringsR.suspicious ?? [])) {
-    if (!byCategory[s.category]) byCategory[s.category] = [];
-    byCategory[s.category].push(s);
+  const byCat: Record<string, { value: string; offset: number }[]> = {};
+  for (const s of (strR.suspicious ?? [])) {
+    if (!byCat[s.category]) byCat[s.category] = [];
+    byCat[s.category].push(s);
   }
-  const catOrder = ["SAFETY_BYPASS", "PRIVATE_KEY", "CERTIFICATE", "API_KEY", "CREDENTIAL",
-    "FLASH_WRITE", "SHELL_COMMAND", "DEBUG_KEYWORD", "CRYPTO", "URL", "IP", "DOMAIN",
-    "NETWORK_SERVICE", "VERSION"];
+  const catOrder = ["SAFETY_BYPASS","PRIVATE_KEY","CERTIFICATE","API_KEY","CREDENTIAL",
+    "FLASH_WRITE","SHELL_COMMAND","DEBUG_KEYWORD","CRYPTO","URL","IP","DOMAIN","NETWORK_SERVICE","VERSION"];
 
-  const riskLevelColor =
-    riskLevel === "critical" ? "text-red-400" :
-    riskLevel === "high"     ? "text-orange-400" :
-    riskLevel === "medium"   ? "text-yellow-400" :
-    riskLevel === "low"      ? "text-green-400"  : "text-slate-400";
+  const fileSev = normSev(riskLevel);
+  const entropySev: PipelineSev = (entropy.overall ?? 0) > 7.5 ? "critical"
+    : (entropy.overall ?? 0) > 6 ? "medium" : "none";
+  const strSuspCount = strR.suspicious_count ?? 0;
+  const strSev: PipelineSev = strSuspCount > 10 ? "critical" : strSuspCount > 3 ? "high"
+    : strSuspCount > 0 ? "medium" : "none";
+  const yaraMatches: { rule: string; severity?: string }[] = yaraR.matches ?? [];
+  const yaraSev: PipelineSev = yaraMatches.some(m => m.severity === "critical") ? "critical"
+    : yaraMatches.some(m => m.severity === "high") ? "high"
+    : yaraMatches.length > 0 ? "medium" : "none";
+  const binCount = (binwalkR.findings ?? []).length;
 
-  const entropyAccent: PhaseAccent = entropy.overall > 7.5 ? "danger" : entropy.overall > 6 ? "warn" : "normal";
-  const strAccent: PhaseAccent     = (stringsR.suspicious_count ?? 0) > 5 ? "danger"
-    : (stringsR.suspicious_count ?? 0) > 0 ? "warn" : "ok";
-  const yaraAccent: PhaseAccent    = (yaraR.matches ?? []).some((m: {severity?: string}) => m.severity === "critical") ? "danger"
-    : (yaraR.matches ?? []).length > 0 ? "warn" : "ok";
-  const riskAccent: PhaseAccent    = riskLevel === "critical" ? "danger" : riskLevel === "high" ? "warn"
-    : riskLevel === "medium" ? "warn" : riskLevel === "low" ? "ok" : "normal";
-
-  return (
-    <div className="space-y-1.5">
-      {/* File header */}
-      <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-slate-700/40" style={{ background: "#161b27" }}>
-        <div className="flex items-center gap-3 min-w-0">
-          <svg className="text-slate-500 flex-shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-          </svg>
-          <span className="font-mono text-sm font-semibold text-white truncate">{filename}</span>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-          <span className={`font-mono text-xs font-bold ${riskLevelColor}`}>{Math.round(riskScore)}/100</span>
-          <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${
-            riskLevel === "critical" ? "bg-red-900/50 text-red-300" :
-            riskLevel === "high"     ? "bg-orange-900/50 text-orange-300" :
-            riskLevel === "medium"   ? "bg-yellow-900/40 text-yellow-300" :
-            riskLevel === "low"      ? "bg-green-900/40 text-green-300" :
-                                       "bg-slate-800 text-slate-400"
-          }`}>{riskLevel}</span>
-        </div>
-      </div>
-
-      {/* Phase 01 — File Identity */}
-      <PhaseSection
-        num="01" icon={PhaseIcons.hash} title="File Identity"
-        summary={hashes.sha256 ? `${hashes.sha256.slice(0, 16)}…` : "—"}
-        accent="normal" defaultOpen
-      >
-        <div className="mt-2 space-y-1.5">
-          {[
-            ["SHA-256", hashes.sha256],
-            ["SHA-1",   hashes.sha1],
-            ["MD5",     hashes.md5],
-          ].map(([label, val]) => (
-            <div key={label} className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest w-14 flex-shrink-0">{label}</span>
-              <span className="font-mono text-[11px] text-slate-400 break-all">{val ?? "—"}</span>
-            </div>
-          ))}
-        </div>
-      </PhaseSection>
-
-      {/* Phase 02 — Entropy */}
-      <PhaseSection
-        num="02" icon={PhaseIcons.entropy} title="Entropy Analysis"
-        summary={`${(entropy.overall ?? 0).toFixed(3)} / 8.000`}
-        accent={entropyAccent} defaultOpen={entropyAccent !== "normal"}
-      >
-        <div className="mt-2 space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full ${entropy.overall > 7.5 ? "bg-red-500" : entropy.overall > 6 ? "bg-amber-500" : "bg-blue-500"}`}
-                style={{ width: `${Math.min(100, ((entropy.overall ?? 0) / 8) * 100).toFixed(1)}%` }}
-              />
-            </div>
-            <span className="font-mono text-xs text-slate-400 w-16 text-right">{(entropy.overall ?? 0).toFixed(3)}</span>
-          </div>
-          <p className="text-xs text-slate-500">{entropy.interpretation ?? "—"}</p>
-          {entropy.blocks?.length > 0 && (
-            <p className="text-[11px] text-slate-600 font-mono">{entropy.blocks.length} blocks analyzed · 1 KB each</p>
-          )}
-        </div>
-      </PhaseSection>
-
-      {/* Phase 03 — String Extraction */}
-      <PhaseSection
-        num="03" icon={PhaseIcons.strings} title="String Extraction"
-        summary={`${stringsR.total ?? 0} total · ${stringsR.suspicious_count ?? 0} suspicious`}
-        accent={strAccent} defaultOpen={(stringsR.suspicious_count ?? 0) > 0}
-      >
-        <div className="mt-2 space-y-2">
-          {(stringsR.suspicious_count ?? 0) === 0 ? (
-            <p className="text-xs text-emerald-500">No suspicious strings found.</p>
-          ) : catOrder.map(cat => {
-            const items = byCategory[cat];
-            if (!items?.length) return null;
-            const catLabel = catStyles[cat]?.label ?? cat;
-            const isCritCat = ["SAFETY_BYPASS", "PRIVATE_KEY", "CERTIFICATE"].includes(cat);
-            const isWarnCat = ["FLASH_WRITE", "API_KEY", "CREDENTIAL", "SHELL_COMMAND", "DEBUG_KEYWORD"].includes(cat);
-            const headerCls = isCritCat ? "text-red-400" : isWarnCat ? "text-amber-400" : "text-slate-400";
-            return (
-              <div key={cat}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${headerCls}`}>{catLabel}</span>
-                  <span className="text-[10px] text-slate-600">({items.length})</span>
-                </div>
-                <div className="space-y-0.5 pl-2 border-l border-slate-800">
-                  {items.slice(0, 6).map((s, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] text-slate-400 truncate flex-1">{s.value}</span>
-                      <span className="font-mono text-[10px] text-slate-700 flex-shrink-0">
-                        0x{s.offset.toString(16).padStart(6, "0")}
-                      </span>
-                    </div>
-                  ))}
-                  {items.length > 6 && (
-                    <span className="text-[10px] text-slate-600 pl-0.5">+{items.length - 6} more</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </PhaseSection>
-
-      {/* Phase 04 — YARA */}
-      <PhaseSection
-        num="04" icon={PhaseIcons.yara} title="YARA Matching"
-        summary={`${(yaraR.matches ?? []).length} match${(yaraR.matches ?? []).length !== 1 ? "es" : ""}`}
-        accent={yaraAccent} defaultOpen={(yaraR.matches ?? []).length > 0}
-      >
-        <div className="mt-2 space-y-1.5">
-          {(yaraR.matches ?? []).length === 0 ? (
-            <p className="text-xs text-emerald-500">No YARA rule matches.</p>
-          ) : (yaraR.matches ?? []).map((m: { rule: string; severity?: string }, i: number) => {
-            const sev = (m.severity ?? "low").toLowerCase();
-            const sevCls =
-              sev === "critical" ? "bg-red-900/50 text-red-300 border-red-700/40" :
-              sev === "high"     ? "bg-orange-900/50 text-orange-300 border-orange-700/40" :
-              sev === "medium"   ? "bg-yellow-900/40 text-yellow-300 border-yellow-700/40" :
-                                   "bg-slate-800 text-slate-400 border-slate-700/40";
-            return (
-              <div key={i} className="flex items-center justify-between gap-3">
-                <span className="font-mono text-xs text-slate-300">{m.rule}</span>
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex-shrink-0 ${sevCls}`}>
-                  {sev}
-                </span>
-              </div>
-            );
-          })}
-          {yaraR.error && <p className="text-[11px] text-slate-600 font-mono">{yaraR.error}</p>}
-        </div>
-      </PhaseSection>
-
-      {/* Phase 05 — Binwalk */}
-      <PhaseSection
-        num="05" icon={PhaseIcons.binwalk} title="Binwalk Signatures"
-        summary={`${(binwalkR.findings ?? []).length} signature${(binwalkR.findings ?? []).length !== 1 ? "s" : ""}`}
-        accent={(binwalkR.findings ?? []).length > 0 ? "warn" : "normal"}
-        defaultOpen={(binwalkR.findings ?? []).length > 0}
-      >
-        <div className="mt-2 space-y-1">
-          {(binwalkR.findings ?? []).length === 0 ? (
-            <p className="text-xs text-slate-500">No embedded signatures — bare-metal MCU firmware (expected).</p>
-          ) : (binwalkR.findings ?? []).map((f: { description: string; offset: number }, i: number) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className="font-mono text-[10px] text-slate-700 flex-shrink-0 w-20">
-                0x{f.offset.toString(16).padStart(6, "0")}
-              </span>
-              <span className="text-xs text-slate-400">{f.description}</span>
-            </div>
-          ))}
-          {binwalkR.error && <p className="text-[11px] text-slate-600">{binwalkR.error}</p>}
-        </div>
-      </PhaseSection>
-
-      {/* Phase 06 — Risk Score */}
-      <PhaseSection
-        num="06" icon={PhaseIcons.risk} title="Risk Assessment"
-        summary={`${Math.round(riskScore)} / 100`}
-        accent={riskAccent} defaultOpen
-      >
-        <div className="mt-2 space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full ${
-                  riskLevel === "critical" ? "bg-red-500" :
-                  riskLevel === "high"     ? "bg-orange-500" :
-                  riskLevel === "medium"   ? "bg-yellow-500" :
-                  riskLevel === "low"      ? "bg-green-500" : "bg-slate-600"
-                }`}
-                style={{ width: `${Math.min(100, Math.round(riskScore))}%` }}
-              />
-            </div>
-            <span className={`font-mono text-sm font-bold w-16 text-right ${riskLevelColor}`}>
-              {Math.round(riskScore)}/100
-            </span>
-          </div>
-          {(riskR.reasons ?? []).length > 0 && (
-            <ul className="space-y-1 pl-1">
-              {(riskR.reasons ?? []).map((r: string, i: number) => (
-                <li key={i} className="text-xs text-slate-500 flex items-start gap-2">
-                  <span className="text-slate-700 mt-0.5 flex-shrink-0">—</span>
-                  {r}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </PhaseSection>
-    </div>
-  );
+  return {
+    file: { name: filename, sha256: hashes.sha256, score: Math.round(riskScore), severity: fileSev },
+    stages: [
+      {
+        id: "file-identity", index: "01", title: "File Identity",
+        summary: hashes.sha256 ? `${hashes.sha256.slice(0, 14)}…` : "—", severity: "none",
+        children: [
+          { id: "sha256", label: "SHA-256", value: hashes.sha256 ?? "—" },
+          { id: "sha1",   label: "SHA-1",   value: hashes.sha1  ?? "—" },
+          { id: "md5",    label: "MD5",     value: hashes.md5   ?? "—" },
+        ],
+      },
+      {
+        id: "entropy", index: "02", title: "Entropy Analysis",
+        summary: `${(entropy.overall ?? 0).toFixed(3)} / 8.000`, severity: entropySev,
+        children: [
+          { id: "ent-val",    label: "Overall",        value: (entropy.overall ?? 0).toFixed(4), severity: entropySev },
+          { id: "ent-interp", label: "Interpretation", value: entropy.interpretation ?? "—" },
+          { id: "ent-blocks", label: "Blocks analyzed", value: String(entropy.blocks?.length ?? 0) },
+        ],
+      },
+      {
+        id: "strings", index: "03", title: "String Extraction",
+        summary: `${strR.total ?? 0} total · ${strSuspCount} suspicious`, severity: strSev,
+        children: catOrder
+          .filter(cat => byCat[cat]?.length)
+          .map(cat => ({
+            id: `cat-${cat}`,
+            label: CAT_LABELS[cat] ?? cat,
+            severity: CAT_SEV[cat] ?? "low",
+            count: byCat[cat].length,
+            children: byCat[cat].slice(0, 10).map((s, i) => ({
+              id: `str-${cat}-${i}`,
+              label: "value",
+              value: s.value.length > 80 ? s.value.slice(0, 80) + "…" : s.value,
+              offset: `0x${s.offset.toString(16).padStart(6, "0")}`,
+              severity: CAT_SEV[cat] ?? "low",
+            })),
+          })),
+      },
+      {
+        id: "yara", index: "04", title: "YARA Matching",
+        summary: `${yaraMatches.length} match${yaraMatches.length !== 1 ? "es" : ""}`, severity: yaraSev,
+        children: yaraMatches.length === 0
+          ? [{ id: "yara-none", label: "No rule matches", severity: "none" as PipelineSev }]
+          : yaraMatches.map((m, i) => ({ id: `yara-${i}`, label: m.rule, severity: normSev(m.severity) })),
+      },
+      {
+        id: "binwalk", index: "05", title: "Binwalk Signatures",
+        summary: `${binCount} signature${binCount !== 1 ? "s" : ""}`,
+        severity: binCount > 0 ? "medium" : "none",
+        children: binCount === 0
+          ? [{ id: "bin-none", label: "No embedded signatures — bare-metal MCU (expected)", severity: "none" as PipelineSev }]
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          : (binwalkR.findings ?? []).map((f: any, i: number) => ({
+              id: `bin-${i}`, label: f.description,
+              offset: `0x${f.offset.toString(16).padStart(6, "0")}`, severity: "medium" as PipelineSev,
+            })),
+      },
+      {
+        id: "risk", index: "06", title: "Risk Assessment",
+        summary: `${Math.round(riskScore)} / 100`, severity: fileSev,
+        children: (riskR.reasons ?? []).map((r: string, i: number) => ({
+          id: `risk-${i}`, label: r, severity: fileSev,
+        })),
+      },
+    ],
+  };
 }
+
+// (old inline PhaseSection / PhaseIcons / PipelineTree removed — see src/components/PipelineTree.tsx)
