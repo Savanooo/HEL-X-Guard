@@ -405,6 +405,7 @@ export default function ScanDetailPage() {
               ))}
             </div>
 
+            <TabErrorBoundary tabKey={tab}>
             {/* Strings tab */}
             {tab === "strings" && (
               suspicious.length === 0 ? (
@@ -502,83 +503,7 @@ export default function ScanDetailPage() {
             )}
             {/* Arch tab */}
             {tab === "arch" && (
-              <div className="space-y-4">
-                {/* Core detection row */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {[
-                    ["Architecture",   archInfo.arch ?? "—"],
-                    ["Endianness",     archInfo.endianness ?? "—"],
-                    ["Bare Metal",     archInfo.is_bare_metal ? "Yes" : "No"],
-                    ["Thumb Mode",     archInfo.thumb_mode != null ? (archInfo.thumb_mode ? "Yes" : "No") : "—"],
-                    ["SP in RAM",      archInfo.sp_in_ram != null ? (archInfo.sp_in_ram ? "Yes" : "No") : "—"],
-                    ["Load Address",   archInfo.inferred_load_address != null ? `0x${archInfo.inferred_load_address.toString(16).toUpperCase()}` : "—"],
-                  ].map(([label, val]) => (
-                    <div key={label} className="rounded-lg px-3 py-2.5 border border-[#1f2840]" style={{ background: "#0b0f1a" }}>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-0.5">{label}</p>
-                      <p className="text-sm font-semibold text-slate-200 font-mono">{val}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ELF security mitigations */}
-                {checksecInfo.is_elf && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">ELF Security Mitigations</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {[
-                        ["NX",      checksecInfo.nx,     true],
-                        ["PIE",     checksecInfo.pie,    true],
-                        ["Canary",  checksecInfo.canary, true],
-                        ["Fortify", checksecInfo.fortify, true],
-                        ["RELRO",   checksecInfo.relro,  "full"],
-                      ].map(([label, val, good]) => {
-                        const ok = val === good || (val === true && good === true) || (val === "full" && good === "full");
-                        return (
-                          <div key={label as string} className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${ok ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}`}>
-                            <span className={`text-sm ${ok ? "text-emerald-400" : "text-red-400"}`}>{ok ? "+" : "−"}</span>
-                            <span className="text-xs font-mono font-semibold text-slate-300">{label as string}</span>
-                            {typeof val === "string" && val !== "true" && val !== "false" && (
-                              <span className="ml-auto text-[10px] text-slate-500">{val}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Reset handler disasm snippet */}
-                {archInfo.reset_disasm && archInfo.reset_disasm.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Reset Handler (first {archInfo.reset_disasm.length} instructions)</p>
-                    <pre className="text-[11px] font-mono text-emerald-300/90 bg-[#060b10] rounded-lg p-3 overflow-x-auto max-h-48 border border-[#1f2840]">
-                      {archInfo.reset_disasm.map((ins: { address: string; mnemonic: string; op_str: string }) =>
-                        `${ins.address}  ${ins.mnemonic.padEnd(8)}${ins.op_str}`
-                      ).join("\n")}
-                    </pre>
-                  </div>
-                )}
-
-                {/* Vector table */}
-                {archInfo.vector_table && archInfo.vector_table.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Interrupt Vectors ({archInfo.vector_table.length})</p>
-                    <div className="max-h-36 overflow-y-auto rounded-lg border border-[#1f2840]" style={{ background: "#0b0f1a" }}>
-                      {archInfo.vector_table.map((v: { index: number; name: string; address: string }, i: number) => (
-                        <div key={i} className="flex gap-3 px-3 py-1 border-b border-[#1f2840] last:border-0 text-xs font-mono">
-                          <span className="text-slate-600 w-6 flex-shrink-0">{v.index}</span>
-                          <span className="text-slate-400 w-28 flex-shrink-0">{v.name}</span>
-                          <span className="text-slate-300">{v.address}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {archInfo.error && (
-                  <p className="text-xs text-slate-500">Arch detect: {archInfo.error}</p>
-                )}
-              </div>
+              <ArchPanel arch={archInfo} checksec={checksecInfo} />
             )}
 
             {/* SBOM tab */}
@@ -682,6 +607,7 @@ export default function ScanDetailPage() {
             {tab === "tree" && !report && (
               <p className="text-slate-500 text-sm text-center py-8">No report data available.</p>
             )}
+            </TabErrorBoundary>
           </Section>
 
           {/* Deep analysis: extract / decompile */}
@@ -1187,6 +1113,199 @@ function CategoryBadge({ cat }: { cat: string }) {
     </span>
   );
 }
+
+// ── Tab error boundary ────────────────────────────────────────────────────────
+// Catches render errors inside a tab so only that tab shows a fallback,
+// not the entire page. Resets automatically when the active tab changes.
+
+interface TebProps { tabKey: string; children: React.ReactNode }
+interface TebState { hasError: boolean; message: string | null; prevTabKey: string }
+
+class TabErrorBoundary extends React.Component<TebProps, TebState> {
+  constructor(props: TebProps) {
+    super(props);
+    this.state = { hasError: false, message: null, prevTabKey: props.tabKey };
+  }
+
+  static getDerivedStateFromProps(props: TebProps, state: TebState): Partial<TebState> | null {
+    if (props.tabKey !== state.prevTabKey) {
+      return { hasError: false, message: null, prevTabKey: props.tabKey };
+    }
+    return null;
+  }
+
+  static getDerivedStateFromError(err: Error): Partial<TebState> {
+    return { hasError: true, message: err.message };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-red-400">Render error in this tab</p>
+          {this.state.message && (
+            <p className="text-[11px] font-mono text-red-400/70 break-all">{this.state.message}</p>
+          )}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
+// ── Arch panel ────────────────────────────────────────────────────────────────
+// Renders the Arch tab. Uses its own state for the collapsible vector table.
+// All address fields from the backend are already hex strings — printed as-is.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ArchPanel({ arch, checksec }: { arch: Record<string, any>; checksec: Record<string, any> }) {
+  const [vtOpen, setVtOpen] = useState(false);
+
+  if (!arch || Object.keys(arch).length === 0) {
+    return <p className="text-sm text-slate-500 text-center py-8">No architecture data available.</p>;
+  }
+
+  if (arch.error && !arch.arch) {
+    return <p className="text-xs text-slate-500 py-4">Arch detect error: {String(arch.error)}</p>;
+  }
+
+  // All address fields are pre-formatted hex strings from the backend.
+  const kvRows: [string, string][] = [
+    ["Architecture",  String(arch.arch     ?? "—")],
+    ["Endianness",    String(arch.endianness ?? "—")],
+    ["Load Address",  String(arch.inferred_load_address ?? "—")],
+    ["Initial SP",    String(arch.initial_sp   ?? "—")],
+    ["Reset Handler", String(arch.reset_handler ?? "—")],
+  ];
+  const boolRows: [string, boolean | undefined][] = [
+    ["Bare Metal", arch.is_bare_metal as boolean | undefined],
+    ["Thumb Mode", arch.thumb_mode    as boolean | undefined],
+    ["SP in RAM",  arch.sp_in_ram     as boolean | undefined],
+  ];
+
+  const vectorTable: { index: number; raw: string; addr: string; thumb: boolean }[] =
+    Array.isArray(arch.vector_table) ? arch.vector_table : [];
+  const resetDisasm: string[] =
+    Array.isArray(arch.reset_disasm) ? arch.reset_disasm : [];
+
+  return (
+    <div className="space-y-4">
+      {/* KV summary grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {kvRows.map(([label, val]) => (
+          <div key={label} className="rounded-lg px-3 py-2.5 border border-[#1f2840]" style={{ background: "#0b0f1a" }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-0.5">{label}</p>
+            <p className="text-[13px] font-semibold text-slate-200 font-mono break-all">{val}</p>
+          </div>
+        ))}
+        {boolRows.map(([label, val]) => {
+          const known = val != null;
+          const yes   = val === true;
+          return (
+            <div
+              key={label}
+              className={`rounded-lg px-3 py-2.5 border ${
+                !known ? "border-[#1f2840]" : yes ? "border-emerald-500/20 bg-emerald-500/5" : "border-slate-600/20"
+              }`}
+              style={!known || !yes ? { background: "#0b0f1a" } : {}}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-0.5">{label}</p>
+              <p className={`text-[13px] font-semibold font-mono ${known ? (yes ? "text-emerald-400" : "text-slate-400") : "text-slate-600"}`}>
+                {!known ? "—" : yes ? "Yes" : "No"}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ELF security mitigations */}
+      {checksec?.is_elf && (
+        <div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">ELF Security Mitigations</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {(
+              [
+                ["NX",      checksec.nx,      true   ],
+                ["PIE",     checksec.pie,     true   ],
+                ["Canary",  checksec.canary,  true   ],
+                ["Fortify", checksec.fortify, true   ],
+                ["RELRO",   checksec.relro,   "full" ],
+              ] as [string, unknown, unknown][]
+            ).map(([label, val, good]) => {
+              const ok = val === good;
+              return (
+                <div key={label} className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${ok ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}`}>
+                  <span className={`text-sm leading-none ${ok ? "text-emerald-400" : "text-red-400"}`}>{ok ? "+" : "−"}</span>
+                  <span className="text-xs font-mono font-semibold text-slate-300">{label}</span>
+                  {typeof val === "string" && (
+                    <span className="ml-auto text-[10px] text-slate-500">{val}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Collapsible vector table */}
+      {vectorTable.length > 0 && (
+        <div>
+          <button
+            onClick={() => setVtOpen(o => !o)}
+            className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 hover:text-slate-200 transition-colors"
+          >
+            <svg
+              className={`w-3 h-3 transition-transform ${vtOpen ? "rotate-90" : ""}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            Interrupt Vectors ({vectorTable.length})
+          </button>
+          {vtOpen && (
+            <div className="rounded-lg border border-[#1f2840] overflow-hidden" style={{ background: "#0b0f1a" }}>
+              <div className="grid grid-cols-[2.5rem_4rem_10rem_1fr] px-3 py-1.5 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                <span>#</span>
+                <span>Raw</span>
+                <span>Address</span>
+                <span>Thumb</span>
+              </div>
+              <div className="max-h-56 overflow-y-auto divide-y divide-[#1f2840]">
+                {vectorTable.map((vt, i) => (
+                  <div key={i} className="grid grid-cols-[2.5rem_4rem_10rem_1fr] px-3 py-1 text-xs font-mono">
+                    <span className="text-slate-600">{vt.index}</span>
+                    <span className="text-slate-500">{String(vt.raw ?? "—")}</span>
+                    <span className="text-slate-300">{String(vt.addr ?? "—")}</span>
+                    <span className={vt.thumb ? "text-blue-400" : "text-slate-600"}>{vt.thumb ? "T" : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reset disasm — already formatted strings */}
+      {resetDisasm.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            Reset Handler ({resetDisasm.length} instructions)
+          </p>
+          <pre className="text-[11px] font-mono text-emerald-300/90 bg-[#060b10] rounded-lg p-3 overflow-x-auto max-h-52 border border-[#1f2840] whitespace-pre">
+            {resetDisasm.map(line => String(line)).join("\n")}
+          </pre>
+        </div>
+      )}
+
+      {arch.error && (
+        <p className="text-[11px] text-slate-500 font-mono">arch_detect error: {String(arch.error)}</p>
+      )}
+    </div>
+  );
+}
+
 
 // ── Pipeline Tree adapter ─────────────────────────────────────────────────────
 // Converts the raw scan report JSON into the PipelineData shape the component expects.
