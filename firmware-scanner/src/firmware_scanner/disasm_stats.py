@@ -1,112 +1,183 @@
-"""Instruction histogram and function-prologue count using capstone.
+"""Instruction histogram and function-prologue estimate using capstone.
 
-Opt-in Tier 2 analysis — heavier than the main scan but still purely static.
-Disassembles the binary in Thumb (default) or ARM mode and produces:
-  - mnemonic histogram (top N)
-  - suspicious instruction occurrences (BKPT, SVC, WFI, WFE)
-  - cheap function-count estimate from PUSH {…, lr} prologues
+Tier 2 opt-in analysis — Thumb-2 linear sweep with ``skipdata=True`` so the
+sweep covers the whole binary instead of stopping at the first data gap.
 
-The full histogram is stored in the DB column (capped at 80 entries);
-function_count and suspicious_instructions go there too.
+Design decisions
+----------------
+* **Always Thumb mode** — Cortex-M is Thumb-2 only.  Passing a different arch
+  string is silently ignored; the module is hard-wired to
+  ``Cs(CS_ARCH_ARM, CS_MODE_THUMB)``.
+* **skipdata=True** — capstone emits a ``.byte`` placeholder for any 2-byte
+  sequence it cannot decode cleanly.  Those placeholders are filtered out and
+  never counted.
+* **No per-instruction lists** — storing a list of 200 k+ instruction objects
+  in the DB column would be huge.  Only aggregates are returned.
+* **Mnemonic normalisation** — width suffixes (``.w``/``.n``) and conditional
+  suffixes (``eq``/``ne``/…) are stripped so ``ldr.w`` and ``ldr`` both count
+  as ``ldr``, and ``beq``/``bne`` both count as ``b``.
+* **function_prologues** — count of ``PUSH {…, lr}`` instructions, the
+  canonical Thumb-2 function-entry pattern.  Labelled as an *approximate*
+  estimate because a linear sweep cannot perfectly separate code from data.
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 from pathlib import Path
 
-_MAX_HISTOGRAM = 80    # top mnemonics to keep
-_MAX_SUSPICIOUS = 100  # cap suspicious instruction list
-_SUSPICIOUS_MNEMONICS = frozenset({"bkpt", "svc", "swi", "hlt", "wfi", "wfe", "dmb", "dsb"})
+_TOP_N         = 25
+_DEFAULT_BASE  = 0x0800_0000   # STM32 flash default
+
+_BRANCH_BASES = frozenset({
+    "b", "bl", "bx", "blx", "cbz", "cbnz", "tbb", "tbh",
+})
+_MEMORY_BASES = frozenset({
+    "ldr", "str", "ldm", "stm",
+    "ldrb", "strb", "ldrh", "strh", "ldrd", "strd",
+    "push", "pop", "vpush", "vpop",
+})
+_SUSPICIOUS = frozenset({"bkpt", "svc", "udf"})
+
+_WIDTH_RE   = re.compile(r"\.(w|n)$")
+_COND_CODES = frozenset({
+    "eq", "ne", "cs", "hs", "cc", "lo",
+    "mi", "pl", "vs", "vc", "hi", "ls",
+    "ge", "lt", "gt", "le",
+})
 
 
-def analyze(
-    path: Path,
-    arch: str = "thumb",
-    load_address: int = 0,
-) -> dict:
-    """Disassemble firmware and compute instruction statistics.
+def _norm(mn: str) -> str:
+    """Strip .w/.n width suffixes and collapse conditional branch variants.
+
+    Examples:
+        "ldr.w"  → "ldr"
+        "str.n"  → "str"
+        "beq"    → "b"
+        "bleq"   → "bl"
+        "bx"     → "bx"   (unchanged — no condition code)
+    """
+    mn = _WIDTH_RE.sub("", mn)
+    if len(mn) >= 3 and mn[0] == "b":
+        suffix = mn[-2:]
+        if suffix in _COND_CODES:
+            base = mn[:-2]
+            if base in ("b", "bl"):
+                return base
+    return mn
+
+
+def analyze(path: Path, arch_info: dict | None = None) -> dict:
+    """Disassemble firmware in Thumb mode and compute instruction statistics.
 
     Args:
-        path: Path to firmware binary.
-        arch: "thumb" (default for Cortex-M), "arm", "arm64", "x86", "x86_64".
-        load_address: Virtual address for the first byte (for annotation only).
+        path:      Path to firmware binary.
+        arch_info: ``report_json["arch"]`` dict; used to extract
+                   ``inferred_load_address`` (a hex string like ``"0x8000000"``).
+                   Falls back to 0x08000000 if absent or unparseable.
 
     Returns:
         {
-            "histogram": {"mnemonic": count, ...},   # top _MAX_HISTOGRAM
-            "total_instructions": int,
-            "function_count": int,
-            "suspicious_instructions": [{"mnemonic", "op_str", "address"}, ...],
-            "arch_used": str,
-            "error": str | None,
+            "available":           bool,
+            "mode":                "thumb",
+            "load_address":        str,    # hex string, e.g. "0x8000000"
+            "code_bytes":          int,
+            "total_instructions":  int,
+            "function_prologues":  int,    # PUSH {…, lr} count — approximate
+            "branch_instructions": int,
+            "memory_instructions": int,
+            "suspicious":          {"bkpt": int, "svc": int, "udf": int},
+            "top_mnemonics":       [{"mnemonic": str, "count": int}, ...],
+            "error":               str | None,
         }
+
+    On any failure returns ``{"available": False, "error": "<message>"}``.
+    Never raises.
     """
+    # ── capstone check ────────────────────────────────────────────────────────
     try:
         import capstone
     except ImportError:
         return {
-            "histogram": {}, "total_instructions": 0, "function_count": 0,
-            "suspicious_instructions": [], "arch_used": arch,
-            "error": "capstone not installed — install with: pip install capstone",
+            "available": False,
+            "error": "capstone not installed — pip install capstone",
         }
 
+    # ── resolve load address ──────────────────────────────────────────────────
+    load_address = _DEFAULT_BASE
+    if arch_info:
+        raw = arch_info.get("inferred_load_address")
+        if raw is not None:
+            try:
+                load_address = int(str(raw), 16)
+            except (ValueError, TypeError):
+                pass
+
+    load_addr_hex = hex(load_address)
+
+    # ── read binary ───────────────────────────────────────────────────────────
     try:
         data = path.read_bytes()
     except OSError as exc:
-        return {
-            "histogram": {}, "total_instructions": 0, "function_count": 0,
-            "suspicious_instructions": [], "arch_used": arch, "error": str(exc),
-        }
+        return {"available": False, "error": str(exc)}
 
+    code_bytes = len(data)
+
+    # ── disassemble ───────────────────────────────────────────────────────────
     try:
-        cs_arch, cs_mode = _resolve_arch(arch, capstone)
-        cs = capstone.Cs(cs_arch, cs_mode)
-        cs.detail = False
+        md = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+        md.detail   = False
+        md.skipdata = True   # emit .byte placeholders instead of halting
 
-        histogram: Counter = Counter()
-        suspicious: list[dict] = []
-        function_count = 0
+        histogram: Counter[str] = Counter()
+        function_prologues = 0
+        branch_count       = 0
+        memory_count       = 0
+        suspicious_counts: dict[str, int] = {k: 0 for k in _SUSPICIOUS}
 
-        for insn in cs.disasm(data, load_address):
-            mn = insn.mnemonic.lower()
+        for insn in md.disasm(data, load_address):
+            raw_mn = insn.mnemonic.lower()
+
+            # Skip .byte / .short / .long skipdata placeholders
+            if raw_mn.startswith("."):
+                continue
+
+            mn = _norm(raw_mn)
             histogram[mn] += 1
 
-            if mn in _SUSPICIOUS_MNEMONICS and len(suspicious) < _MAX_SUSPICIOUS:
-                suspicious.append({
-                    "mnemonic": mn,
-                    "op_str":   insn.op_str,
-                    "address":  hex(insn.address),
-                })
+            if mn in _SUSPICIOUS:
+                suspicious_counts[mn] = suspicious_counts.get(mn, 0) + 1
 
-            # Count Thumb PUSH {… lr} or ARM STMDB sp!, {… lr} as function prologues
-            if mn in ("push", "stmdb") and "lr" in insn.op_str:
-                function_count += 1
+            if mn in _BRANCH_BASES:
+                branch_count += 1
 
-        top = dict(histogram.most_common(_MAX_HISTOGRAM))
+            if mn in _MEMORY_BASES:
+                memory_count += 1
+
+            # Canonical Thumb-2 function entry: PUSH {…, lr}
+            # capstone uses "lr" for r14 in Thumb mode; guard r14 too for safety
+            if mn == "push" and ("lr" in insn.op_str or "r14" in insn.op_str):
+                function_prologues += 1
+
+        total = sum(histogram.values())
+        top_mnemonics = [
+            {"mnemonic": mn, "count": cnt}
+            for mn, cnt in histogram.most_common(_TOP_N)
+        ]
 
         return {
-            "histogram":              top,
-            "total_instructions":     sum(histogram.values()),
-            "function_count":         function_count,
-            "suspicious_instructions": suspicious,
-            "arch_used":              arch,
-            "error":                  None,
+            "available":           True,
+            "mode":                "thumb",
+            "load_address":        load_addr_hex,
+            "code_bytes":          code_bytes,
+            "total_instructions":  total,
+            "function_prologues":  function_prologues,
+            "branch_instructions": branch_count,
+            "memory_instructions": memory_count,
+            "suspicious":          suspicious_counts,
+            "top_mnemonics":       top_mnemonics,
+            "error":               None,
         }
 
     except Exception as exc:  # noqa: BLE001
-        return {
-            "histogram": {}, "total_instructions": 0, "function_count": 0,
-            "suspicious_instructions": [], "arch_used": arch, "error": str(exc),
-        }
-
-
-def _resolve_arch(arch: str, capstone) -> tuple:  # type: ignore[type-arg]
-    mapping = {
-        "thumb":   (capstone.CS_ARCH_ARM,   capstone.CS_MODE_THUMB),
-        "arm":     (capstone.CS_ARCH_ARM,   capstone.CS_MODE_ARM),
-        "arm64":   (capstone.CS_ARCH_ARM64, capstone.CS_MODE_ARM),
-        "x86":     (capstone.CS_ARCH_X86,   capstone.CS_MODE_32),
-        "x86_64":  (capstone.CS_ARCH_X86,   capstone.CS_MODE_64),
-    }
-    arch_lower = arch.lower().replace("cortex-m", "thumb").replace("arm cortex-m", "thumb")
-    return mapping.get(arch_lower, mapping["thumb"])
+        return {"available": False, "error": str(exc)}

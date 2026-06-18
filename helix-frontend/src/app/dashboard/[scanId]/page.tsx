@@ -683,9 +683,11 @@ export default function ScanDetailPage() {
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <p className="text-sm font-semibold text-slate-200">Disasm Stats</p>
                     <JobStatusPill status={scan.disasm_status} />
-                    {disasmResult && (disasmResult as { function_count?: number }).function_count != null && (
+                    {scan.disasm_status === "completed" && (disasmResult as { total_instructions?: number }).total_instructions != null && (
                       <span className="text-xs text-slate-500">
-                        {(disasmResult as { function_count: number }).function_count} functions · {(disasmResult as { total_instructions: number }).total_instructions} instructions
+                        {((disasmResult as { total_instructions: number }).total_instructions).toLocaleString()} insns
+                        {" · "}
+                        {(disasmResult as { function_prologues?: number }).function_prologues ?? 0} prologues
                       </span>
                     )}
                   </div>
@@ -717,6 +719,14 @@ export default function ScanDetailPage() {
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Decompiled Functions</p>
                 <DecompileFunctions functions={scan.decompile.functions} />
+              </div>
+            )}
+
+            {/* Disasm results — full width */}
+            {scan.disasm_status === "completed" && scan.disasm && (
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Disasm Stats</p>
+                <DisasmResults disasm={scan.disasm} />
               </div>
             )}
           </Section>
@@ -1113,6 +1123,97 @@ function CategoryBadge({ cat }: { cat: string }) {
     </span>
   );
 }
+
+// ── Disasm results panel ──────────────────────────────────────────────────────
+
+function DisasmResults({ disasm }: { disasm: Record<string, unknown> }) {
+  if (!disasm || disasm.available === false) {
+    return (
+      <p className="text-xs text-slate-500 font-mono">
+        {String(disasm?.error ?? "No disassembly data available.")}
+      </p>
+    );
+  }
+
+  const total     = (disasm.total_instructions  as number | undefined) ?? 0;
+  const prologues = (disasm.function_prologues   as number | undefined) ?? 0;
+  const branches  = (disasm.branch_instructions  as number | undefined) ?? 0;
+  const memory    = (disasm.memory_instructions  as number | undefined) ?? 0;
+  const codeBytes = (disasm.code_bytes           as number | undefined) ?? 0;
+  const mode      = (disasm.load_address         as string | undefined) ?? "—";
+
+  const susp = (disasm.suspicious as Record<string, number> | undefined) ?? {};
+  const suspEntries = Object.entries(susp).filter(([, v]) => v > 0);
+
+  const tops = Array.isArray(disasm.top_mnemonics)
+    ? (disasm.top_mnemonics as { mnemonic: string; count: number }[])
+    : [];
+  const maxCount = tops.length > 0 ? tops[0].count : 1;
+
+  return (
+    <div className="space-y-4">
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {[
+          ["Total Instructions",         total.toLocaleString()],
+          ["Prologue Candidates ≈",      prologues.toLocaleString()],
+          ["Branch Instructions",        branches.toLocaleString()],
+          ["Memory Instructions",        memory.toLocaleString()],
+        ].map(([label, val]) => (
+          <div key={label} className="rounded-lg px-3 py-2.5 border border-[#1f2840]" style={{ background: "#0b0f1a" }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-0.5">{label}</p>
+            <p className="text-base font-semibold text-slate-200 font-mono">{val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Meta row */}
+      <div className="flex flex-wrap gap-4 text-xs text-slate-500 font-mono px-1">
+        <span>mode: <span className="text-slate-300">thumb</span></span>
+        <span>base: <span className="text-slate-300">{mode}</span></span>
+        <span>file: <span className="text-slate-300">{(codeBytes / 1024).toFixed(0)} KB</span></span>
+      </div>
+
+      {/* Suspicious instructions */}
+      {suspEntries.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {suspEntries.map(([mn, count]) => (
+            <span key={mn} className="inline-flex items-center gap-1.5 rounded border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-xs font-mono">
+              <span className="font-semibold text-orange-300">{mn}</span>
+              <span className="text-orange-400/70">{count}×</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Top mnemonics bar chart */}
+      {tops.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">Top Mnemonics</p>
+          <div className="space-y-1">
+            {tops.map(({ mnemonic, count }) => {
+              const pct = Math.max(2, Math.round((count / maxCount) * 100));
+              return (
+                <div key={mnemonic} className="flex items-center gap-2 text-xs font-mono">
+                  <span className="w-12 text-right text-slate-400 flex-shrink-0">{mnemonic}</span>
+                  <div className="flex-1 h-1.5 bg-[#1f2840] rounded-full overflow-hidden max-w-[200px]">
+                    <div className="h-full rounded-full bg-blue-500/70" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-slate-500 w-16 flex-shrink-0">{count.toLocaleString()}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {typeof disasm.error === "string" && disasm.error && (
+        <p className="text-[11px] text-slate-500 font-mono">error: {disasm.error}</p>
+      )}
+    </div>
+  );
+}
+
 
 // ── Tab error boundary ────────────────────────────────────────────────────────
 // Catches render errors inside a tab so only that tab shows a fallback,

@@ -322,27 +322,15 @@ def _run_disasm(scan_id: str, stored_path: str, arch: str = "thumb") -> None:
         scan.disasm_status = "running"
         db.commit()
 
-        from firmware_scanner import disasm_stats, arch_detect as ad
+        from firmware_scanner import disasm_stats
+
+        arch_info = None
+        if scan.report_json:
+            arch_info = json.loads(scan.report_json).get("arch")
 
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
-            # Auto-detect arch from existing scan report if available
-            if arch == "auto" and scan.report_json:
-                report_data = json.loads(scan.report_json)
-                detected_arch = report_data.get("arch", {}).get("arch", "unknown")
-                if "Cortex-M" in detected_arch or detected_arch == "ARM Cortex-M":
-                    arch = "thumb"
-                elif detected_arch not in ("unknown", ""):
-                    arch = detected_arch.lower()
-
-            load_addr_str = None
-            if scan.report_json:
-                report_data = json.loads(scan.report_json)
-                load_addr_str = report_data.get("arch", {}).get("inferred_load_address")
-
-            load_address = int(load_addr_str, 16) if load_addr_str else 0
-
-            result = disasm_stats.analyze(local_path, arch=arch, load_address=load_address)
+            result = disasm_stats.analyze(local_path, arch_info=arch_info)
         finally:
             storage.cleanup_temp(local_path, is_temp)
 
