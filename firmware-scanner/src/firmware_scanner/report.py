@@ -43,6 +43,11 @@ def build(
     yara_result: dict,
     risk_result: dict,
     elf_result: dict | None = None,
+    arch_result: dict | None = None,
+    checksec_result: dict | None = None,
+    crypto_result: dict | None = None,
+    components_result: dict | None = None,
+    cert_result: dict | None = None,
 ) -> dict:
     """Assemble all analysis results into the canonical JSON report."""
     size_bytes = path.stat().st_size
@@ -59,12 +64,17 @@ def build(
             "hashes": hash_result,
             "type": _detect_file_type(path),
         },
-        "entropy": entropy_result,
-        "strings": strings_result,
-        "binwalk": binwalk_result,
-        "yara": yara_result,
-        "elf": elf_result if elf_result is not None else {"is_elf": False},
-        "risk": risk_result,
+        "entropy":     entropy_result,
+        "strings":     strings_result,
+        "binwalk":     binwalk_result,
+        "yara":        yara_result,
+        "elf":         elf_result if elf_result is not None else {"is_elf": False},
+        "arch":        arch_result if arch_result is not None else {"is_bare_metal": False},
+        "checksec":    checksec_result if checksec_result is not None else {"is_elf": False},
+        "crypto":      crypto_result if crypto_result is not None else {"matches": [], "count": 0},
+        "components":  components_result if components_result is not None else {"components": [], "count": 0},
+        "certs":       cert_result if cert_result is not None else {"certificates": [], "count": 0},
+        "risk":        risk_result,
     }
 
 

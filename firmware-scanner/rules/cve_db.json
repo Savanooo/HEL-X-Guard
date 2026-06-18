@@ -1,0 +1,274 @@
+[
+  {
+    "cve_id": "CVE-2018-16522",
+    "component": "FreeRTOS",
+    "affected_versions": ["<=10.0.1", "10.0.0", "10.0.1"],
+    "cvss": 10.0,
+    "severity": "critical",
+    "summary": "Heap buffer overflow in FreeRTOS TCP/IP stack allows remote code execution via crafted TCP packets."
+  },
+  {
+    "cve_id": "CVE-2018-16525",
+    "component": "FreeRTOS",
+    "affected_versions": ["<=10.0.1", "10.0.0", "10.0.1"],
+    "cvss": 10.0,
+    "severity": "critical",
+    "summary": "Out-of-bounds write in FreeRTOS TCP/IP stack via malformed DHCP response."
+  },
+  {
+    "cve_id": "CVE-2018-16526",
+    "component": "FreeRTOS",
+    "affected_versions": ["<=10.0.1", "10.0.0", "10.0.1"],
+    "cvss": 10.0,
+    "severity": "critical",
+    "summary": "FreeRTOS IP packet defragmentation buffer overflow — remote code execution."
+  },
+  {
+    "cve_id": "CVE-2021-31571",
+    "component": "FreeRTOS",
+    "affected_versions": ["<=10.4.4", "10.4.0", "10.4.1", "10.4.2", "10.4.3", "10.4.4"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "FreeRTOS+TCP: heap overflow in DNS response parsing (long hostname)."
+  },
+  {
+    "cve_id": "CVE-2021-31572",
+    "component": "FreeRTOS",
+    "affected_versions": ["<=10.4.4", "10.4.0", "10.4.1", "10.4.2", "10.4.3", "10.4.4"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "FreeRTOS+TCP: out-of-bounds read in DNS parsing; possible information disclosure."
+  },
+  {
+    "cve_id": "CVE-2022-36137",
+    "component": "FreeRTOS",
+    "affected_versions": ["<10.5.0", "10.4.*"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "FreeRTOS+TCP: improper handling of TCP window scale option may lead to heap corruption."
+  },
+  {
+    "cve_id": "CVE-2020-13988",
+    "component": "lwIP",
+    "affected_versions": ["<=2.1.2", "2.0.*", "2.1.0", "2.1.1", "2.1.2"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "lwIP IGMP integer overflow via crafted multicast packet — denial of service."
+  },
+  {
+    "cve_id": "CVE-2020-22283",
+    "component": "lwIP",
+    "affected_versions": ["<=2.1.2", "2.0.*", "2.1.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "lwIP TCP stack buffer overflow in tcp_listen_input() allows remote code execution."
+  },
+  {
+    "cve_id": "CVE-2021-22959",
+    "component": "lwIP",
+    "affected_versions": ["<=2.1.3", "2.1.0", "2.1.1", "2.1.2", "2.1.3"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "lwIP DNS name compression pointer loop causes infinite loop (DoS)."
+  },
+  {
+    "cve_id": "CVE-2023-1283",
+    "component": "lwIP",
+    "affected_versions": ["<2.2.0", "2.1.*", "2.0.*"],
+    "cvss": 8.1,
+    "severity": "high",
+    "summary": "lwIP: buffer over-read in netif_add() via long interface name string."
+  },
+  {
+    "cve_id": "CVE-2018-9988",
+    "component": "mbedTLS",
+    "affected_versions": ["<=2.7.3", "2.7.0", "2.7.1", "2.7.2", "2.7.3", "2.6.*", "2.5.*"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "mbedTLS: heap-based buffer over-read in ssl_parse_server_key_exchange()."
+  },
+  {
+    "cve_id": "CVE-2018-9989",
+    "component": "mbedTLS",
+    "affected_versions": ["<=2.7.3", "2.7.0", "2.7.1", "2.7.2", "2.7.3", "2.6.*", "2.5.*"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "mbedTLS: heap-based buffer over-read in ssl_parse_server_psk_hint()."
+  },
+  {
+    "cve_id": "CVE-2021-24119",
+    "component": "mbedTLS",
+    "affected_versions": ["<2.28.0", "2.27.*", "2.26.*", "2.25.*", "2.24.*", "2.23.*", "2.22.*", "2.21.*", "2.20.*", "2.19.*", "2.18.*"],
+    "cvss": 5.9,
+    "severity": "medium",
+    "summary": "mbedTLS: timing side-channel in ECDSA signature generation leaks private key bits."
+  },
+  {
+    "cve_id": "CVE-2022-35409",
+    "component": "mbedTLS",
+    "affected_versions": ["<3.2.0", "3.1.*", "3.0.*", "2.28.0", "2.27.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "mbedTLS: buffer overflow via crafted DTLS ClientHello record (PSK mode)."
+  },
+  {
+    "cve_id": "CVE-2022-42905",
+    "component": "wolfSSL",
+    "affected_versions": ["<=5.5.1", "5.5.0", "5.5.1", "5.4.*", "5.3.*", "5.2.*", "5.1.*", "5.0.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "wolfSSL: out-of-bounds write in OCSP response processing allows code execution."
+  },
+  {
+    "cve_id": "CVE-2021-37155",
+    "component": "wolfSSL",
+    "affected_versions": ["<5.0.0", "4.8.*", "4.7.*", "4.6.*", "4.5.*", "4.4.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "wolfSSL: heap-based buffer overflow in TLS 1.3 certificate chain parsing."
+  },
+  {
+    "cve_id": "CVE-2023-3724",
+    "component": "wolfSSL",
+    "affected_versions": ["<5.6.4", "5.6.3", "5.6.2", "5.6.1", "5.6.0", "5.5.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "wolfSSL: out-of-bounds write during TLS session resumption can corrupt memory."
+  },
+  {
+    "cve_id": "CVE-2014-0160",
+    "component": "OpenSSL",
+    "affected_versions": ["1.0.1", "1.0.1a", "1.0.1b", "1.0.1c", "1.0.1d", "1.0.1e", "1.0.1f"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "OpenSSL Heartbleed: up to 64KB of private memory leaked per request via TLS heartbeat."
+  },
+  {
+    "cve_id": "CVE-2022-0778",
+    "component": "OpenSSL",
+    "affected_versions": ["<1.0.2zd", "<1.1.1n", "<3.0.2", "1.0.2*", "1.1.0*", "1.1.1*", "3.0.0", "3.0.1"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "OpenSSL: infinite loop in BN_mod_sqrt() for non-prime moduli — denial of service."
+  },
+  {
+    "cve_id": "CVE-2023-0286",
+    "component": "OpenSSL",
+    "affected_versions": ["<1.0.2zg", "<1.1.1t", "<3.0.8", "3.0.0", "3.0.1", "3.0.2", "3.0.3", "3.0.4", "3.0.5", "3.0.6", "3.0.7"],
+    "cvss": 7.4,
+    "severity": "high",
+    "summary": "OpenSSL: type confusion in X.400 address processing — remote code execution possible."
+  },
+  {
+    "cve_id": "CVE-2022-37434",
+    "component": "zlib",
+    "affected_versions": ["<=1.2.12", "1.2.12", "1.2.11", "1.2.10", "1.2.9", "1.2.8"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "zlib: heap-based buffer over-read/write in inflate() via crafted gzip header."
+  },
+  {
+    "cve_id": "CVE-2018-25032",
+    "component": "zlib",
+    "affected_versions": ["<=1.2.11", "1.2.11", "1.2.10", "1.2.9", "1.2.8", "1.2.7", "1.2.6", "1.2.5"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "zlib: memory corruption in deflate() when using Z_FIXED strategy."
+  },
+  {
+    "cve_id": "CVE-2022-30065",
+    "component": "BusyBox",
+    "affected_versions": ["<=1.35.0", "1.35.0", "1.34.*", "1.33.*", "1.32.*", "1.31.*", "1.30.*"],
+    "cvss": 7.8,
+    "severity": "high",
+    "summary": "BusyBox awk: use-after-free in getvar_i() leads to arbitrary code execution."
+  },
+  {
+    "cve_id": "CVE-2021-42374",
+    "component": "BusyBox",
+    "affected_versions": ["<=1.34.1", "1.34.0", "1.34.1", "1.33.*", "1.32.*"],
+    "cvss": 5.5,
+    "severity": "medium",
+    "summary": "BusyBox bunzip2: out-of-bounds read via crafted bzip2 archive — denial of service."
+  },
+  {
+    "cve_id": "CVE-2022-28391",
+    "component": "BusyBox",
+    "affected_versions": ["<=1.35.0", "1.35.0", "1.34.*"],
+    "cvss": 8.8,
+    "severity": "high",
+    "summary": "BusyBox netcat: remote code execution via crafted arguments to nc applet."
+  },
+  {
+    "cve_id": "CVE-2022-2338",
+    "component": "mongoose",
+    "affected_versions": ["<7.7", "7.0", "7.1", "7.2", "7.3", "7.4", "7.5", "7.6"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "Mongoose web server: heap overflow in HTTP multipart form boundary parsing."
+  },
+  {
+    "cve_id": "CVE-2022-2855",
+    "component": "mongoose",
+    "affected_versions": ["<7.8", "7.0", "7.1", "7.2", "7.3", "7.4", "7.5", "7.6", "7.7"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "Mongoose: stack overflow in mg_http_parse() via crafted HTTP request line."
+  },
+  {
+    "cve_id": "CVE-2022-32221",
+    "component": "libcurl",
+    "affected_versions": ["<7.86.0", "7.85.*", "7.84.*", "7.83.*", "7.82.*", "7.81.*", "7.80.*", "7.79.*"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "libcurl: header injection via POST-to-GET redirect with content-type header."
+  },
+  {
+    "cve_id": "CVE-2023-38545",
+    "component": "libcurl",
+    "affected_versions": ["<8.4.0", "8.3.*", "8.2.*", "8.1.*", "8.0.*", "7.9*", "7.8*", "7.7*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "libcurl: heap-based buffer overflow in SOCKS5 proxy handshake (CRITICAL)."
+  },
+  {
+    "cve_id": "CVE-2019-14868",
+    "component": "newlib",
+    "affected_versions": ["<=3.1.0", "3.0.*", "2.9.*", "2.8.*", "2.7.*", "2.6.*"],
+    "cvss": 7.5,
+    "severity": "high",
+    "summary": "newlib: sprintf buffer overflow via crafted format string in _vfprintf_r."
+  },
+  {
+    "cve_id": "CVE-2023-25139",
+    "component": "newlib",
+    "affected_versions": ["<=4.2.0", "4.2.0", "4.1.*", "4.0.*", "3.5.*", "3.4.*", "3.3.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "newlib: sprintf() buffer overflow via very long argument to snprintf without bound."
+  },
+  {
+    "cve_id": "CVE-2022-28738",
+    "component": "expat",
+    "affected_versions": ["<2.4.8", "2.4.7", "2.4.6", "2.4.5", "2.4.4", "2.4.3", "2.4.2", "2.4.1", "2.4.0", "2.3.*", "2.2.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "Expat XML parser: realloc() mismatch in XML_GetBuffer() leads to heap corruption."
+  },
+  {
+    "cve_id": "CVE-2022-25235",
+    "component": "expat",
+    "affected_versions": ["<2.4.5", "2.4.4", "2.4.3", "2.4.2", "2.4.1", "2.4.0", "2.3.*", "2.2.*"],
+    "cvss": 9.8,
+    "severity": "critical",
+    "summary": "Expat: malformed 2- and 3-byte UTF-8 sequences can cause arbitrary code execution."
+  },
+  {
+    "cve_id": "CVE-2021-45960",
+    "component": "expat",
+    "affected_versions": ["<2.4.3", "2.4.2", "2.4.1", "2.4.0", "2.3.*", "2.2.*", "2.1.*"],
+    "cvss": 8.8,
+    "severity": "high",
+    "summary": "Expat: large number of prefixed XML attributes cause signed int overflow in m_groupSize."
+  }
+]

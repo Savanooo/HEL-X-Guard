@@ -86,6 +86,16 @@ class Scan(Base):
     decompile_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     decompile_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Tier 2 opt-in — CVE cross-reference (triggered via POST /scans/{id}/analyze/cve)
+    cve_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    cve_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cve_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Tier 2 opt-in — instruction histogram (triggered via POST /scans/{id}/analyze/disasm)
+    disasm_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    disasm_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    disasm_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, index=True
     )

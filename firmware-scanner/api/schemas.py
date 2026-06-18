@@ -37,6 +37,10 @@ class DecompileRequest(BaseModel):
     base_address: str | None = None
 
 
+class DisasmRequest(BaseModel):
+    arch: str = "thumb"  # thumb | arm | arm64 | x86 | x86_64
+
+
 # ── Scans ─────────────────────────────────────────────────────────────────────
 
 class ScanResponse(BaseModel):
@@ -63,6 +67,13 @@ class ScanDetailResponse(ScanResponse):
     extraction_error: str | None = None
     decompile: dict[str, Any] | None = None
     decompile_error: str | None = None
+    # Tier 2 opt-in results
+    cve_status: str | None = None
+    cve: dict[str, Any] | None = None
+    cve_error: str | None = None
+    disasm_status: str | None = None
+    disasm: dict[str, Any] | None = None
+    disasm_error: str | None = None
 
 
 class ScanListResponse(BaseModel):

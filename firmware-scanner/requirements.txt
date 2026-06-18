@@ -6,6 +6,15 @@ click>=8.1.0
 # Note: On Python 3.13+ may require compiling from source with YARA C library headers.
 yara-python>=4.2.0
 
+# Tier 1 static analysis — architecture detection, ELF parse, instruction disasm
+# capstone: ARM Thumb/ARM/x86 disassembler (used by arch_detect + disasm_stats)
+capstone>=5.0.0
+# lief: ELF/PE/MachO parser for checksec mitigations
+lief>=0.13.0
+
+# Tier 3 — X.509 certificate extraction (cert_extract.py)
+cryptography>=41.0.0
+
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0

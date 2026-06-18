@@ -55,6 +55,43 @@ _PATTERNS: dict[str, re.Pattern] = {
         r'\b(?:telnet|ftp|tftp|ssh|admin)\b.*\b\d{1,5}\b',
         re.IGNORECASE,
     ),
+    "MQTT_BROKER": re.compile(
+        r'(?:'
+        r'mqtt://[^\s"\'<>]{4,}'
+        r'|mqtts://[^\s"\'<>]{4,}'
+        r'|\bmqtt\b.{0,20}\b(?:1883|8883|1884)\b'
+        r'|(?:broker|mosquitto|emqx|hivemq)[^\s"\'<>]{4,}'
+        r')',
+        re.IGNORECASE,
+    ),
+    "AT_COMMAND": re.compile(
+        r'(?:'
+        r'AT\+(?:CWJAP|CWLAP|CIPSTART|CIPSEND|CIPCLOSE|CIPMODE|CIFSR|CWMODE|CWAUTOCONN|MQTTCONN|MQTTPUB)'
+        r'|AT\+[A-Z]{2,8}(?:=[^\n\r]{0,60})?'
+        r')',
+        re.IGNORECASE,
+    ),
+    "BOOTLOADER": re.compile(
+        r'(?:'
+        r'\b(?:DFU_MODE|BOOT_BYPASS|dfu_download|bootloader_version|enter_dfu|boot_reason)\b'
+        r'|\bSYS_BOOT_MODE\b'
+        r'|Jump_To_Application\b'
+        r'|\bIAP_\w+'
+        r')',
+        re.IGNORECASE,
+    ),
+    "FILE_PATH": re.compile(
+        r'(?:/(?:etc|proc|dev|sys|var|tmp|usr|root|home)/[^\s"\'<>]{3,})',
+        re.IGNORECASE,
+    ),
+    "WIFI_CREDENTIAL": re.compile(
+        r'(?:'
+        r'(?:ssid|wifi_ssid|wpa_passphrase|wifi_pass(?:word)?)\s*[=:]\s*\S+'
+        r'|wifi_key\s*[=:]\s*\S+'
+        r'|WPA2?\s*[=:]\s*\S+'
+        r')',
+        re.IGNORECASE,
+    ),
     "VERSION": re.compile(
         r'(?:[Vv]ersion|[Ff][Ww]\s*[Vv]er|SW\s*[Vv]er|HW\s*[Vv]er)\s*[:\s]\s*\d+\.\d+[\.\d]*',
     ),
@@ -81,15 +118,20 @@ _CATEGORY_PRIORITY = [
     "PRIVATE_KEY",
     "CERTIFICATE",
     "API_KEY",
+    "WIFI_CREDENTIAL",
     "CREDENTIAL",
     "URL",
     "IP",
     "DOMAIN",
     "SHELL_COMMAND",
+    "MQTT_BROKER",
+    "AT_COMMAND",
+    "BOOTLOADER",
     "SAFETY_BYPASS",
     "FLASH_WRITE",
     "DEBUG_KEYWORD",
     "NETWORK_SERVICE",
+    "FILE_PATH",
     "CRYPTO",
     "VERSION",
 ]
@@ -212,12 +254,14 @@ def scan(
         {
             "total": int,
             "suspicious": [{"value": str, "category": str, "offset": int, "encoding": str}, ...],
-            "suspicious_count": int
+            "suspicious_count": int,
+            "category_counts": {"PRIVATE_KEY": int, ...},
         }
     """
     total = 0
     suspicious: list[dict] = []
     seen_offsets: set[int] = set()
+    seen_values: set[tuple[str, str]] = set()  # (value, category) dedup
 
     for encoding, pattern in [("ascii", _ASCII_RE), ("utf16le", _UTF16LE_RE)]:
         for value, offset, enc in _iter_raw_strings(path, pattern, encoding, min_length, chunk_size):
@@ -228,15 +272,25 @@ def scan(
 
             category = _classify(value)
             if category:
-                suspicious.append({
-                    "value": value,
-                    "category": category,
-                    "offset": offset,
-                    "encoding": enc,
-                })
+                key = (value, category)
+                if key not in seen_values:
+                    seen_values.add(key)
+                    suspicious.append({
+                        "value":    value,
+                        "category": category,
+                        "offset":   offset,
+                        "encoding": enc,
+                    })
+
+    # Per-category counts for quick risk-scoring access
+    category_counts: dict[str, int] = {}
+    for item in suspicious:
+        cat = item["category"]
+        category_counts[cat] = category_counts.get(cat, 0) + 1
 
     return {
-        "total": total,
-        "suspicious": suspicious,
+        "total":           total,
+        "suspicious":      suspicious,
         "suspicious_count": len(suspicious),
+        "category_counts": category_counts,
     }

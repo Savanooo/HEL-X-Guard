@@ -13,8 +13,8 @@ from ..audit import log_action
 from ..auth import require_analyst, require_viewer
 from ..database import get_db
 from ..models import Scan, User
-from ..runner import dispatch_decompile, dispatch_extraction, dispatch_scan
-from ..schemas import DecompileRequest, ScanDetailResponse, ScanDiffResponse, ScanListResponse, ScanResponse
+from ..runner import dispatch_cve, dispatch_decompile, dispatch_disasm, dispatch_extraction, dispatch_scan
+from ..schemas import DecompileRequest, DisasmRequest, ScanDetailResponse, ScanDiffResponse, ScanListResponse, ScanResponse
 from .. import storage
 
 router = APIRouter(prefix="/api/v1/scans", tags=["scans"])
@@ -51,6 +51,10 @@ def _to_detail(scan: Scan) -> ScanDetailResponse:
         detail.extraction = json.loads(scan.extraction_json)
     if scan.decompile_json:
         detail.decompile = json.loads(scan.decompile_json)
+    if scan.cve_json:
+        detail.cve = json.loads(scan.cve_json)
+    if scan.disasm_json:
+        detail.disasm = json.loads(scan.disasm_json)
     return detail
 
 
@@ -411,6 +415,93 @@ def diff_scans(
         "yara_new":        yara_new,
         "yara_resolved":   yara_resolved,
     }
+
+
+@router.post(
+    "/{scan_id}/analyze/cve",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=ScanDetailResponse,
+    summary="Trigger CVE cross-reference against detected components (Tier 2)",
+)
+def trigger_cve(
+    scan_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_analyst),
+) -> ScanDetailResponse:
+    """Cross-reference the SBOM detected by components.py against the offline
+    CVE database (rules/cve_db.json). Requires a completed scan."""
+    scan = _get_scan(scan_id, current_user, db, request=request, action="trigger_cve")
+
+    if scan.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Initial scan must complete before CVE match can run",
+        )
+    if scan.cve_status in ("pending", "running"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CVE match already in progress")
+    if not scan.report_json:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not available")
+
+    scan.cve_status = "pending"
+    scan.cve_json   = None
+    scan.cve_error  = None
+    db.commit()
+    db.refresh(scan)
+
+    log_action(
+        db, action="trigger_cve", user=current_user, resource_type="scan",
+        resource_id=scan_id, request=request,
+    )
+
+    dispatch_cve(scan_id)
+    return _to_detail(scan)
+
+
+@router.post(
+    "/{scan_id}/analyze/disasm",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=ScanDetailResponse,
+    summary="Trigger capstone instruction histogram analysis (Tier 2)",
+)
+def trigger_disasm(
+    scan_id: str,
+    request: Request,
+    body: DisasmRequest = DisasmRequest(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_analyst),
+) -> ScanDetailResponse:
+    """Run capstone-based disassembly statistics on the firmware.
+    Returns instruction histogram, suspicious instruction list, and a
+    cheap function count estimate. Never executes the binary."""
+    scan = _get_scan(scan_id, current_user, db, request=request, action="trigger_disasm")
+
+    if scan.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Initial scan must complete before disassembly can run",
+        )
+    if scan.disasm_status in ("pending", "running"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Disassembly already in progress")
+    if not scan.stored_path or not storage.exists(scan.stored_path):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Original firmware file is no longer available",
+        )
+
+    scan.disasm_status = "pending"
+    scan.disasm_json   = None
+    scan.disasm_error  = None
+    db.commit()
+    db.refresh(scan)
+
+    log_action(
+        db, action="trigger_disasm", user=current_user, resource_type="scan",
+        resource_id=scan_id, request=request,
+    )
+
+    dispatch_disasm(scan_id, scan.stored_path, arch=body.arch)
+    return _to_detail(scan)
 
 
 @router.delete(

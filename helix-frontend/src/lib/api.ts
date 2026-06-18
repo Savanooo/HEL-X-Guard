@@ -71,6 +71,8 @@ export interface Scan {
   risk_level: RiskLevel | null;
   extraction_status?: JobStatus;
   decompile_status?: JobStatus;
+  cve_status?: JobStatus;
+  disasm_status?: JobStatus;
   created_at: string;
   completed_at: string | null;
   error_message?: string | null;
@@ -82,6 +84,12 @@ export interface Scan {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   decompile?: Record<string, any> | null;
   decompile_error?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  cve?: Record<string, any> | null;
+  cve_error?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  disasm?: Record<string, any> | null;
+  disasm_error?: string | null;
 }
 
 export interface ScanList {
@@ -169,6 +177,15 @@ export const triggerDecompile = (
   req<Scan>(`/api/v1/scans/${id}/decompile`, {
     method: "POST",
     body: JSON.stringify({ processor: processor ?? null, base_address: base_address ?? null }),
+  });
+
+export const triggerCve = (id: string) =>
+  req<Scan>(`/api/v1/scans/${id}/analyze/cve`, { method: "POST" });
+
+export const triggerDisasm = (id: string, arch = "thumb") =>
+  req<Scan>(`/api/v1/scans/${id}/analyze/disasm`, {
+    method: "POST",
+    body: JSON.stringify({ arch }),
   });
 
 /** Downloads the PDF report. Uses fetch (not a plain <a href>) because the

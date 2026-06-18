@@ -26,3 +26,8 @@ minio>=7.2.0
 # on Windows; xhtml2pdf has no system dependencies and works everywhere)
 xhtml2pdf>=0.2.17
 jinja2>=3.1.0
+
+# Tier 1/2 static analysis (mirrors requirements.txt — needed in API worker too)
+capstone>=5.0.0
+lief>=0.13.0
+cryptography>=41.0.0

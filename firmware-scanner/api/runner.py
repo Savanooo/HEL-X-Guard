@@ -25,7 +25,12 @@ _RULES_PATH = Path(__file__).resolve().parent.parent / "rules" / "firmware_rules
 def _run_local(firmware_path: Path) -> dict:
     """Run the scanner directly in the current process (no Docker)."""
     from firmware_scanner import (
+        arch_detect,
         binwalk_runner,
+        cert_extract,
+        checksec,
+        components,
+        crypto_constants,
         elf_analysis,
         entropy,
         hashing,
@@ -37,15 +42,34 @@ def _run_local(firmware_path: Path) -> dict:
 
     rules_path = _RULES_PATH if _RULES_PATH.exists() else None
 
+    # Tier 1 — always-on, fast
     hash_r    = hashing.hash_file(firmware_path)
     entropy_r = entropy.analyze(firmware_path)
     strings_r = strings_scan.scan(firmware_path)
     binwalk_r = binwalk_runner.scan(firmware_path)
     yara_r    = yara_runner.scan(firmware_path, rules_path=rules_path) if rules_path else {"matches": [], "error": None}
     elf_r     = elf_analysis.analyze(firmware_path)
-    risk_r    = risk_scoring.score(entropy_r, strings_r, yara_r, binwalk_r, elf_r)
+    arch_r    = arch_detect.analyze(firmware_path)
+    checksec_r = checksec.analyze(firmware_path)
+    crypto_r  = crypto_constants.analyze(firmware_path)
+    comp_r    = components.analyze(firmware_path)
+    cert_r    = cert_extract.analyze(firmware_path)
 
-    return report.build(firmware_path, hash_r, entropy_r, strings_r, binwalk_r, yara_r, risk_r, elf_r)
+    risk_r = risk_scoring.score(
+        entropy_r, strings_r, yara_r, binwalk_r, elf_r,
+        checksec_result=checksec_r,
+        cert_result=cert_r,
+    )
+
+    return report.build(
+        firmware_path, hash_r, entropy_r, strings_r, binwalk_r, yara_r, risk_r,
+        elf_result=elf_r,
+        arch_result=arch_r,
+        checksec_result=checksec_r,
+        crypto_result=crypto_r,
+        components_result=comp_r,
+        cert_result=cert_r,
+    )
 
 
 # ── Docker scan ───────────────────────────────────────────────────────────────
@@ -235,6 +259,124 @@ def start_decompile_thread(scan_id: str, stored_path: str,
     t.start()
 
 
+# ── CVE match (Tier 2 opt-in) ─────────────────────────────────────────────────
+
+def _run_cve_match(scan_id: str) -> None:
+    """Run CVE cross-reference against detected components from an existing scan."""
+    db = SessionLocal()
+    try:
+        scan = db.get(Scan, scan_id)
+        if scan is None:
+            return
+
+        scan.cve_status = "running"
+        db.commit()
+
+        report_data = json.loads(scan.report_json) if scan.report_json else {}
+        comp_r = report_data.get("components", {"components": [], "count": 0})
+
+        from firmware_scanner import cve_match, risk_scoring
+        result = cve_match.match(comp_r)
+
+        scan = db.get(Scan, scan_id)
+        if scan is not None:
+            scan.cve_status = "failed" if result.get("error") else "completed"
+            scan.cve_json   = json.dumps(result, ensure_ascii=False)
+            scan.cve_error  = result.get("error")
+            db.commit()
+
+    except Exception as exc:  # noqa: BLE001
+        try:
+            scan = db.get(Scan, scan_id)
+            if scan is not None:
+                scan.cve_status = "failed"
+                scan.cve_error  = str(exc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+def start_cve_thread(scan_id: str) -> None:
+    """Spawn a daemon thread to run CVE cross-reference."""
+    t = threading.Thread(
+        target=_run_cve_match,
+        args=(scan_id,),
+        daemon=True,
+        name=f"cve-{scan_id[:8]}",
+    )
+    t.start()
+
+
+# ── Disasm stats (Tier 2 opt-in) ──────────────────────────────────────────────
+
+def _run_disasm(scan_id: str, stored_path: str, arch: str = "thumb") -> None:
+    """Run capstone instruction histogram analysis."""
+    db = SessionLocal()
+    try:
+        scan = db.get(Scan, scan_id)
+        if scan is None:
+            return
+
+        scan.disasm_status = "running"
+        db.commit()
+
+        from firmware_scanner import disasm_stats, arch_detect as ad
+
+        local_path, is_temp = storage.resolve_for_analysis(stored_path)
+        try:
+            # Auto-detect arch from existing scan report if available
+            if arch == "auto" and scan.report_json:
+                report_data = json.loads(scan.report_json)
+                detected_arch = report_data.get("arch", {}).get("arch", "unknown")
+                if "Cortex-M" in detected_arch or detected_arch == "ARM Cortex-M":
+                    arch = "thumb"
+                elif detected_arch not in ("unknown", ""):
+                    arch = detected_arch.lower()
+
+            load_addr_str = None
+            if scan.report_json:
+                report_data = json.loads(scan.report_json)
+                load_addr_str = report_data.get("arch", {}).get("inferred_load_address")
+
+            load_address = int(load_addr_str, 16) if load_addr_str else 0
+
+            result = disasm_stats.analyze(local_path, arch=arch, load_address=load_address)
+        finally:
+            storage.cleanup_temp(local_path, is_temp)
+
+        scan = db.get(Scan, scan_id)
+        if scan is not None:
+            scan.disasm_status = "failed" if result.get("error") else "completed"
+            scan.disasm_json   = json.dumps(result, ensure_ascii=False)
+            scan.disasm_error  = result.get("error")
+            db.commit()
+
+    except Exception as exc:  # noqa: BLE001
+        try:
+            scan = db.get(Scan, scan_id)
+            if scan is not None:
+                scan.disasm_status = "failed"
+                scan.disasm_error  = str(exc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+def start_disasm_thread(scan_id: str, stored_path: str, arch: str = "thumb") -> None:
+    """Spawn a daemon thread to run disassembly statistics."""
+    t = threading.Thread(
+        target=_run_disasm,
+        args=(scan_id, stored_path, arch),
+        daemon=True,
+        name=f"disasm-{scan_id[:8]}",
+    )
+    t.start()
+
+
 # ── Dispatch (Faz 5 — Celery when enabled, thread otherwise) ─────────────────
 #
 # Routers call these instead of the start_*_thread functions directly, so
@@ -266,3 +408,11 @@ def dispatch_decompile(scan_id: str, stored_path: str,
         run_decompile_task.delay(scan_id, stored_path, processor, base_address)
     else:
         start_decompile_thread(scan_id, stored_path, processor, base_address)
+
+
+def dispatch_cve(scan_id: str) -> None:
+    start_cve_thread(scan_id)
+
+
+def dispatch_disasm(scan_id: str, stored_path: str, arch: str = "thumb") -> None:
+    start_disasm_thread(scan_id, stored_path, arch)

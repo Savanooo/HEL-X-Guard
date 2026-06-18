@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getScan, triggerExtract, triggerDecompile, downloadReportPdf, type Scan } from "@/lib/api";
+import { getScan, triggerExtract, triggerDecompile, triggerCve, triggerDisasm, downloadReportPdf, type Scan } from "@/lib/api";
 import RiskBadge from "@/components/RiskBadge";
 import RiskGauge from "@/components/RiskGauge";
 import StatusBadge from "@/components/StatusBadge";
@@ -83,7 +83,7 @@ export default function ScanDetailPage() {
   const router = useRouter();
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree">("strings");
+  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree" | "arch" | "sbom" | "crypto">("strings");
   const [extractError, setExtractError] = useState("");
   const [decompileError, setDecompileError] = useState("");
   const [triggeringExtract, setTriggeringExtract] = useState(false);
@@ -93,6 +93,10 @@ export default function ScanDetailPage() {
   const [baseAddress, setBaseAddress] = useState("0x08000000");
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState("");
+  const [triggeringCve, setTriggeringCve] = useState(false);
+  const [cveError, setCveError] = useState("");
+  const [triggeringDisasm, setTriggeringDisasm] = useState(false);
+  const [disasmError, setDisasmError] = useState("");
 
   const fetchScan = useCallback(async () => {
     try {
@@ -111,9 +115,11 @@ export default function ScanDetailPage() {
     const interval = setInterval(async () => {
       const s = await fetchScan();
       const mainDone = !s || s.status === "completed" || s.status === "failed";
-      const extractDone = !s?.extraction_status || ["completed", "failed"].includes(s.extraction_status);
-      const decompileDone = !s?.decompile_status || ["completed", "failed"].includes(s.decompile_status);
-      if (mainDone && extractDone && decompileDone) {
+      const extractDone = !s?.extraction_status || ["completed", "failed"].includes(s.extraction_status as string);
+      const decompileDone = !s?.decompile_status || ["completed", "failed"].includes(s.decompile_status as string);
+      const cveDone = !s?.cve_status || ["completed", "failed"].includes(s.cve_status as string);
+      const disasmDone = !s?.disasm_status || ["completed", "failed"].includes(s.disasm_status as string);
+      if (mainDone && extractDone && decompileDone && cveDone && disasmDone) {
         clearInterval(interval);
       }
     }, 2500);
@@ -144,6 +150,32 @@ export default function ScanDetailPage() {
       setDecompileError(err instanceof Error ? err.message : "Failed to trigger decompilation");
     } finally {
       setTriggeringDecompile(false);
+    }
+  }
+
+  async function handleTriggerCve() {
+    setCveError("");
+    setTriggeringCve(true);
+    try {
+      const updated = await triggerCve(scanId);
+      setScan(updated);
+    } catch (err) {
+      setCveError(err instanceof Error ? err.message : "Failed to trigger CVE match");
+    } finally {
+      setTriggeringCve(false);
+    }
+  }
+
+  async function handleTriggerDisasm() {
+    setDisasmError("");
+    setTriggeringDisasm(true);
+    try {
+      const updated = await triggerDisasm(scanId);
+      setScan(updated);
+    } catch (err) {
+      setDisasmError(err instanceof Error ? err.message : "Failed to trigger disassembly");
+    } finally {
+      setTriggeringDisasm(false);
     }
   }
 
@@ -187,7 +219,13 @@ export default function ScanDetailPage() {
   const riskInfo   = report?.risk    ?? {};
   const stringsInfo = report?.strings ?? {};
   const yaraInfo   = report?.yara    ?? {};
-  const binwalkInfo = report?.binwalk ?? {};
+  const binwalkInfo  = report?.binwalk     ?? {};
+  const archInfo     = report?.arch        ?? {};
+  const checksecInfo = report?.checksec    ?? {};
+  const cryptoInfo   = report?.crypto      ?? {};
+  const compInfo     = report?.components  ?? {};
+  const cveResult    = scan.cve            ?? {};
+  const disasmResult = scan.disasm         ?? {};
 
   const suspicious: { value: string; category: string; offset: number; encoding: string }[] =
     stringsInfo.suspicious ?? [];
@@ -336,13 +374,16 @@ export default function ScanDetailPage() {
             title={`Findings — ${suspicious.length} strings · ${yaraMatches.length} YARA · ${binwalkFindings.length} binwalk`}
           >
             {/* Tab bar */}
-            <div className="flex gap-1 mb-5 border-b border-[#1f2840] pb-0">
+            <div className="flex flex-wrap gap-1 mb-5 border-b border-[#1f2840] pb-0">
               {(
                 [
-                  ["strings", "Strings", suspicious.length],
-                  ["yara",    "YARA",    yaraMatches.length],
-                  ["binwalk", "Binwalk", binwalkFindings.length],
-                  ["tree",    "Pipeline Tree", null],
+                  ["strings", "Strings",      suspicious.length],
+                  ["yara",    "YARA",          yaraMatches.length],
+                  ["binwalk", "Binwalk",        binwalkFindings.length],
+                  ["arch",    "Arch",           archInfo.is_bare_metal ? 1 : null],
+                  ["sbom",    "SBOM",           compInfo.count ?? null],
+                  ["crypto",  "Crypto",         cryptoInfo.count ?? null],
+                  ["tree",    "Pipeline Tree",  null],
                 ] as [typeof tab, string, number | null][]
               ).map(([t, label, count]) => (
                 <button
@@ -459,6 +500,174 @@ export default function ScanDetailPage() {
                 </div>
               )
             )}
+            {/* Arch tab */}
+            {tab === "arch" && (
+              <div className="space-y-4">
+                {/* Core detection row */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    ["Architecture",   archInfo.arch ?? "—"],
+                    ["Endianness",     archInfo.endianness ?? "—"],
+                    ["Bare Metal",     archInfo.is_bare_metal ? "Yes" : "No"],
+                    ["Thumb Mode",     archInfo.thumb_mode != null ? (archInfo.thumb_mode ? "Yes" : "No") : "—"],
+                    ["SP in RAM",      archInfo.sp_in_ram != null ? (archInfo.sp_in_ram ? "Yes" : "No") : "—"],
+                    ["Load Address",   archInfo.inferred_load_address != null ? `0x${archInfo.inferred_load_address.toString(16).toUpperCase()}` : "—"],
+                  ].map(([label, val]) => (
+                    <div key={label} className="rounded-lg px-3 py-2.5 border border-[#1f2840]" style={{ background: "#0b0f1a" }}>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-0.5">{label}</p>
+                      <p className="text-sm font-semibold text-slate-200 font-mono">{val}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ELF security mitigations */}
+                {checksecInfo.is_elf && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">ELF Security Mitigations</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {[
+                        ["NX",      checksecInfo.nx,     true],
+                        ["PIE",     checksecInfo.pie,    true],
+                        ["Canary",  checksecInfo.canary, true],
+                        ["Fortify", checksecInfo.fortify, true],
+                        ["RELRO",   checksecInfo.relro,  "full"],
+                      ].map(([label, val, good]) => {
+                        const ok = val === good || (val === true && good === true) || (val === "full" && good === "full");
+                        return (
+                          <div key={label as string} className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${ok ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"}`}>
+                            <span className={`text-sm ${ok ? "text-emerald-400" : "text-red-400"}`}>{ok ? "+" : "−"}</span>
+                            <span className="text-xs font-mono font-semibold text-slate-300">{label as string}</span>
+                            {typeof val === "string" && val !== "true" && val !== "false" && (
+                              <span className="ml-auto text-[10px] text-slate-500">{val}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reset handler disasm snippet */}
+                {archInfo.reset_disasm && archInfo.reset_disasm.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Reset Handler (first {archInfo.reset_disasm.length} instructions)</p>
+                    <pre className="text-[11px] font-mono text-emerald-300/90 bg-[#060b10] rounded-lg p-3 overflow-x-auto max-h-48 border border-[#1f2840]">
+                      {archInfo.reset_disasm.map((ins: { address: string; mnemonic: string; op_str: string }) =>
+                        `${ins.address}  ${ins.mnemonic.padEnd(8)}${ins.op_str}`
+                      ).join("\n")}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Vector table */}
+                {archInfo.vector_table && archInfo.vector_table.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Interrupt Vectors ({archInfo.vector_table.length})</p>
+                    <div className="max-h-36 overflow-y-auto rounded-lg border border-[#1f2840]" style={{ background: "#0b0f1a" }}>
+                      {archInfo.vector_table.map((v: { index: number; name: string; address: string }, i: number) => (
+                        <div key={i} className="flex gap-3 px-3 py-1 border-b border-[#1f2840] last:border-0 text-xs font-mono">
+                          <span className="text-slate-600 w-6 flex-shrink-0">{v.index}</span>
+                          <span className="text-slate-400 w-28 flex-shrink-0">{v.name}</span>
+                          <span className="text-slate-300">{v.address}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {archInfo.error && (
+                  <p className="text-xs text-slate-500">Arch detect: {archInfo.error}</p>
+                )}
+              </div>
+            )}
+
+            {/* SBOM tab */}
+            {tab === "sbom" && (
+              <div className="space-y-4">
+                {/* Component list */}
+                {compInfo.count === 0 || !compInfo.components?.length ? (
+                  <p className="text-sm text-slate-500 text-center py-8">No SBOM components detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(compInfo.components as { component: string; version: string | null; evidence_offset: number; evidence: string }[]).map((c, i) => {
+                      const cves = ((cveResult as { matches?: { component: string; cve_id: string; cvss: number; severity: string; summary: string }[] }).matches ?? []).filter(m => m.component === c.component);
+                      const maxSev = cves.reduce((acc: string, m) => {
+                        const order = ["critical","high","medium","low","informational"];
+                        return order.indexOf(m.severity) < order.indexOf(acc) ? m.severity : acc;
+                      }, "informational");
+                      const hasCve = cves.length > 0;
+                      return (
+                        <div key={i} className={`rounded-lg border px-4 py-3 ${hasCve ? "border-orange-500/30 bg-orange-500/5" : "border-[#1f2840]"}`} style={hasCve ? {} : { background: "#0b0f1a" }}>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="font-semibold text-slate-200 text-sm">{c.component}</span>
+                            {c.version && (
+                              <span className="font-mono text-xs text-slate-400 bg-[#1f2840] px-2 py-0.5 rounded">{c.version}</span>
+                            )}
+                            {hasCve && (
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+                                maxSev === "critical" ? "bg-red-500/15 text-red-300 border-red-500/30" :
+                                maxSev === "high"     ? "bg-orange-500/15 text-orange-300 border-orange-500/30" :
+                                                        "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                              }`}>
+                                {cves.length} CVE{cves.length !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                            <span className="ml-auto text-xs text-slate-600 font-mono">0x{c.evidence_offset.toString(16).padStart(6, "0")}</span>
+                          </div>
+                          <p className="text-[10px] font-mono text-slate-600 mt-1 truncate">{c.evidence}</p>
+                          {hasCve && (
+                            <div className="mt-2 space-y-1">
+                              {cves.map((cv, j) => (
+                                <div key={j} className="flex items-center gap-2 text-xs text-slate-400">
+                                  <span className="font-mono font-semibold text-slate-300">{cv.cve_id}</span>
+                                  <span className="text-slate-600">CVSS {cv.cvss}</span>
+                                  <span className="text-slate-500 truncate">{cv.summary}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* CVE summary if no components but CVEs exist */}
+                {scan.cve_status === "completed" && !compInfo.count && (cveResult as { count?: number }).count === 0 && (
+                  <p className="text-xs text-slate-500 text-center">No CVE matches found.</p>
+                )}
+              </div>
+            )}
+
+            {/* Crypto tab */}
+            {tab === "crypto" && (
+              <div className="space-y-3">
+                {cryptoInfo.count === 0 || !cryptoInfo.matches?.length ? (
+                  <p className="text-sm text-slate-500 text-center py-8">No cryptographic constants detected.</p>
+                ) : (
+                  <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                    <div className="grid grid-cols-[8rem_5rem_1fr] px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                      <span>Algorithm</span>
+                      <span>Confidence</span>
+                      <span>Offset</span>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto divide-y divide-[#1f2840]">
+                      {(cryptoInfo.matches as { algo: string; offset: number; confidence: string }[]).map((m, i) => (
+                        <div key={i} className="grid grid-cols-[8rem_5rem_1fr] px-3 py-2 hover:bg-[#161d2e] transition-colors text-xs">
+                          <span className="font-mono font-semibold text-blue-300">{m.algo}</span>
+                          <span className={`font-semibold ${
+                            m.confidence === "high"   ? "text-red-400" :
+                            m.confidence === "medium" ? "text-amber-400" : "text-slate-500"
+                          }`}>{m.confidence}</span>
+                          <span className="font-mono text-slate-500">0x{m.offset.toString(16).padStart(6, "0")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Pipeline Tree tab */}
             {tab === "tree" && report && (
               <PipelineTree
@@ -518,6 +727,53 @@ export default function ScanDetailPage() {
                 >
                   {triggeringDecompile && <Spinner size={12} />}
                   {scan.decompile_status ? "Re-run" : "Run Decompile"}
+                </button>
+              </div>
+
+              {/* CVE Match row */}
+              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "#0b0f1a" }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-200">CVE Match</p>
+                    <JobStatusPill status={scan.cve_status} />
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">Cross-references detected SBOM components against offline CVE database.</p>
+                  {cveError && <p className="text-xs text-red-400 mt-1">{cveError}</p>}
+                  {scan.cve_error && <p className="text-xs text-slate-500 mt-1">⚠ {scan.cve_error}</p>}
+                </div>
+                <button
+                  onClick={handleTriggerCve}
+                  disabled={triggeringCve || scan.cve_status === "pending" || scan.cve_status === "running"}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors flex-shrink-0"
+                >
+                  {triggeringCve && <Spinner size={12} />}
+                  {scan.cve_status ? "Re-run" : "Run CVE Match"}
+                </button>
+              </div>
+
+              {/* Disasm Stats row */}
+              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "#0b0f1a" }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-200">Disasm Stats</p>
+                    <JobStatusPill status={scan.disasm_status} />
+                    {disasmResult && (disasmResult as { function_count?: number }).function_count != null && (
+                      <span className="text-xs text-slate-500">
+                        {(disasmResult as { function_count: number }).function_count} functions · {(disasmResult as { total_instructions: number }).total_instructions} instructions
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">Capstone instruction histogram and function prologue count — Thumb/ARM/x86.</p>
+                  {disasmError && <p className="text-xs text-red-400 mt-1">{disasmError}</p>}
+                  {scan.disasm_error && <p className="text-xs text-slate-500 mt-1">⚠ {scan.disasm_error}</p>}
+                </div>
+                <button
+                  onClick={handleTriggerDisasm}
+                  disabled={triggeringDisasm || scan.disasm_status === "pending" || scan.disasm_status === "running"}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors flex-shrink-0"
+                >
+                  {triggeringDisasm && <Spinner size={12} />}
+                  {scan.disasm_status ? "Re-run" : "Run Disasm"}
                 </button>
               </div>
             </div>
@@ -908,8 +1164,13 @@ const catStyles: Record<string, { bg: string; label: string }> = {
   URL:             { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "URL" },
   IP:              { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "IP" },
   DOMAIN:          { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "DOMAIN" },
-  NETWORK_SERVICE: { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "NETWORK" },
-  VERSION:         { bg: "bg-slate-600/15 text-slate-500 border border-slate-600/30",  label: "VERSION" },
+  NETWORK_SERVICE:   { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "NETWORK" },
+  WIFI_CREDENTIAL:   { bg: "bg-orange-500/15 text-orange-300 border border-orange-500/30", label: "WIFI CRED" },
+  MQTT_BROKER:       { bg: "bg-amber-500/15 text-amber-300 border border-amber-500/30",  label: "MQTT" },
+  AT_COMMAND:        { bg: "bg-amber-500/15 text-amber-300 border border-amber-500/30",  label: "AT CMD" },
+  BOOTLOADER:        { bg: "bg-orange-500/15 text-orange-300 border border-orange-500/30", label: "BOOTLOADER" },
+  FILE_PATH:         { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "FILE PATH" },
+  VERSION:           { bg: "bg-slate-600/15 text-slate-500 border border-slate-600/30",  label: "VERSION" },
   CRITICAL:        { bg: "bg-red-500/15 text-red-300 border border-red-500/30",        label: "CRITICAL" },
   HIGH:            { bg: "bg-orange-500/15 text-orange-300 border border-orange-500/30", label: "HIGH" },
   MEDIUM:          { bg: "bg-amber-500/15 text-amber-300 border border-amber-500/30",  label: "MEDIUM" },
@@ -935,13 +1196,15 @@ const CAT_LABELS: Record<string, string> = {
   API_KEY: "API Key", CREDENTIAL: "Credential", FLASH_WRITE: "Flash Write",
   SHELL_COMMAND: "Shell Command", DEBUG_KEYWORD: "Debug Keyword", CRYPTO: "Crypto",
   URL: "URL", IP: "IP Address", DOMAIN: "Domain", NETWORK_SERVICE: "Network Service",
-  VERSION: "Version String",
+  VERSION: "Version String", WIFI_CREDENTIAL: "WiFi Credential", MQTT_BROKER: "MQTT Broker",
+  AT_COMMAND: "AT Command", BOOTLOADER: "Bootloader", FILE_PATH: "File Path",
 };
 const CAT_SEV: Record<string, PipelineSev> = {
   SAFETY_BYPASS: "critical", PRIVATE_KEY: "critical", CERTIFICATE: "critical",
-  API_KEY: "high", CREDENTIAL: "high", FLASH_WRITE: "high",
-  SHELL_COMMAND: "medium", DEBUG_KEYWORD: "medium", CRYPTO: "medium",
-  URL: "low", IP: "low", DOMAIN: "low", NETWORK_SERVICE: "low", VERSION: "info",
+  API_KEY: "high", CREDENTIAL: "high", FLASH_WRITE: "high", WIFI_CREDENTIAL: "high",
+  BOOTLOADER: "high", SHELL_COMMAND: "medium", DEBUG_KEYWORD: "medium", CRYPTO: "medium",
+  MQTT_BROKER: "medium", AT_COMMAND: "medium",
+  URL: "low", IP: "low", DOMAIN: "low", NETWORK_SERVICE: "low", FILE_PATH: "low", VERSION: "info",
 };
 
 function normSev(s?: string | null): PipelineSev {
@@ -970,7 +1233,8 @@ function buildPipelineData(filename: string, report: Record<string, any>, riskSc
     byCat[s.category].push(s);
   }
   const catOrder = ["SAFETY_BYPASS","PRIVATE_KEY","CERTIFICATE","API_KEY","CREDENTIAL",
-    "FLASH_WRITE","SHELL_COMMAND","DEBUG_KEYWORD","CRYPTO","URL","IP","DOMAIN","NETWORK_SERVICE","VERSION"];
+    "WIFI_CREDENTIAL","FLASH_WRITE","BOOTLOADER","SHELL_COMMAND","DEBUG_KEYWORD","CRYPTO",
+    "MQTT_BROKER","AT_COMMAND","URL","IP","DOMAIN","NETWORK_SERVICE","FILE_PATH","VERSION"];
 
   const fileSev = normSev(riskLevel);
   const entropySev: PipelineSev = (entropy.overall ?? 0) > 7.5 ? "critical"

@@ -565,6 +565,136 @@ rule SemihostingDebugTraps
         2 of them
 }
 
+// ─────────────────────────────────────────────────────────────
+// TIER 2 — EMBEDDED MCU / IoT SPECIFIC RULES (6 new)
+// ─────────────────────────────────────────────────────────────
+
+rule SWDJTAGEnable
+{
+    meta:
+        description = "SWD/JTAG debug port enable sequence — physical debug access may be possible"
+        severity    = "high"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "DBGMCU_EnableDBGSleepMode"  ascii nocase
+        $s2 = "DBGMCU_Config"              ascii nocase
+        $s3 = "CoreDebug->DEMCR"           ascii
+        $s4 = "OpenOCD"                    ascii nocase
+        $s5 = "SWCLK"                      ascii
+        $s6 = "SWDIO"                      ascii
+        $s7 = "jtag_enable"                ascii nocase
+        $s8 = "swd_enable"                 ascii nocase
+        // ARM CoreSight DEMCR TRCENA bit set: 0x01000000 LE
+        $b1 = { 00 00 00 01 }
+
+    condition:
+        2 of ($s*) or ($b1 and 1 of ($s*))
+}
+
+rule BootloaderUnlock
+{
+    meta:
+        description = "Bootloader unlock or download-mode entry — device can be reflashed without authentication"
+        severity    = "high"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "bootloader_unlock"   ascii nocase
+        $s2 = "download_mode"       ascii nocase
+        $s3 = "BOOT_MODE_DOWNLOAD"  ascii nocase
+        $s4 = "enter_isp"           ascii nocase
+        $s5 = "DFU_MODE"            ascii nocase
+        $s6 = "boot_to_dfu"         ascii nocase
+        $s7 = "IAP_execute"         ascii nocase
+        $s8 = "Jump_To_Application" ascii
+        $s9 = "UNLOCK_KEY"          ascii nocase
+
+    condition:
+        any of them
+}
+
+rule HardcodedWiFiCredentials
+{
+    meta:
+        description = "Hardcoded WiFi SSID or WPA/WPA2 passphrase embedded in firmware"
+        severity    = "high"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = /(?:ssid|wifi_ssid)\s*[=:]\s*"[^"]{1,32}"/              ascii nocase
+        $s2 = /(?:wpa_passphrase|wifi_pass(?:word)?)\s*[=:]\s*"[^"]+"/  ascii nocase
+        $s3 = /wifi_key\s*[=:]\s*"[^"]+"/                             ascii nocase
+        $s4 = "AT+CWJAP="                                              ascii
+        $s5 = /AT\+CWJAP=[",][^,\n]{1,32},[",][^"\n]{8,}/             ascii
+
+    condition:
+        any of them
+}
+
+rule HardcodedMQTTCredentials
+{
+    meta:
+        description = "MQTT broker URL with possible embedded username/password in firmware"
+        severity    = "medium"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = /mqtt:\/\/[a-zA-Z0-9._\-]+:[^@\s]{3,}@[a-zA-Z0-9._\-]+/  ascii nocase
+        $s2 = /mqtts:\/\/[a-zA-Z0-9._\-]+:[^@\s]{3,}@[a-zA-Z0-9._\-]+/ ascii nocase
+        $s3 = "mqtt_user"      ascii nocase
+        $s4 = "mqtt_password"  ascii nocase
+        $s5 = "mqtt_passwd"    ascii nocase
+        $s6 = "MQTT_USER"      ascii
+        $s7 = "MQTT_PASS"      ascii
+
+    condition:
+        any of ($s1, $s2) or 2 of ($s3, $s4, $s5, $s6, $s7)
+}
+
+rule OTAFirmwareUpdateURL
+{
+    meta:
+        description = "OTA firmware update URL — verify TLS enforcement and signature validation"
+        severity    = "medium"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = /https?:\/\/[^\s"'<>]{4,}\/(?:firmware|ota|update|fw)[^\s"'<>]{0,80}\.(?:bin|hex|zip|tar|gz)/  ascii nocase
+        $s2 = "ota_url"              ascii nocase
+        $s3 = "firmware_update_url"  ascii nocase
+        $s4 = "update_server"        ascii nocase
+        $s5 = "OTA_SERVER"           ascii
+        $s6 = "fw_update_url"        ascii nocase
+
+    condition:
+        any of ($s1) or 2 of ($s2, $s3, $s4, $s5, $s6)
+}
+
+rule ATCommandBackdoor
+{
+    meta:
+        description = "AT-command backdoor or hidden AT-command handler — undocumented control interface"
+        severity    = "high"
+        author      = "HELİX-Guard"
+
+    strings:
+        $s1 = "AT+BACKDOOR"    ascii nocase
+        $s2 = "AT+FACTORY"     ascii nocase
+        $s3 = "AT+DEBUG"       ascii nocase
+        $s4 = "AT+UNLOCK"      ascii nocase
+        $s5 = "AT+HIDDEN"      ascii nocase
+        $s6 = "AT+SECRET"      ascii nocase
+        $s7 = "at_handler"     ascii nocase
+        $s8 = "atcmd_process"  ascii nocase
+        // Suspicious: AT handler with no documentation string nearby
+        $s9 = /AT\+[A-Z]{4,12}=\?/  ascii
+
+    condition:
+        any of ($s1, $s2, $s3, $s4, $s5, $s6) or
+        (2 of ($s7, $s8) and $s9)
+}
+
 rule MedicalDeviceSensitiveStrings
 {
     meta:
