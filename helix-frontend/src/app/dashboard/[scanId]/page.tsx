@@ -684,9 +684,19 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
 
   const q        = search.toLowerCase();
   const filtered = q
-    ? functions.filter(f => f.name.toLowerCase().includes(q) || (searchCode && f.code.toLowerCase().includes(q)))
+    ? functions.filter(f =>
+        f.name.toLowerCase().includes(q) ||
+        f.address.toLowerCase().includes(q) ||
+        (searchCode && f.code.toLowerCase().includes(q))
+      )
     : functions;
-  const groups   = groupByBlock(filtered);
+  const groups = groupByBlock(filtered);
+  const maxFn  = Math.max(1, ...groups.map(g => g.items.length));
+
+  // Address range bounds
+  const allAddrs = functions.map(f => parseInt(f.address, 16) || 0);
+  const minAddr  = allAddrs.length ? Math.min(...allAddrs) : 0;
+  const maxAddr  = allAddrs.length ? Math.max(...allAddrs) : 0;
 
   function toggleGroup(key: string) {
     setOpenGroups(prev => {
@@ -696,101 +706,159 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
     });
   }
 
+  function densityColor(count: number) {
+    const pct = count / maxFn;
+    if (pct > 0.75) return { bar: "bg-red-500",    text: "text-red-400" };
+    if (pct > 0.45) return { bar: "bg-amber-500",   text: "text-amber-400" };
+    if (pct > 0.20) return { bar: "bg-blue-500",    text: "text-blue-400" };
+    return              { bar: "bg-slate-600",    text: "text-slate-500" };
+  }
+
+  const allOpen = openGroups.size === groups.length && groups.length > 0;
+
   return (
-    <div>
-      {/* Search bar */}
-      <div className="flex gap-2 items-center mb-3">
-        <div className="relative flex-1">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-600" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <div className="space-y-3">
+      {/* Top bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
             type="text"
             placeholder={`Search ${functions.length} functions…`}
             value={search}
             onChange={e => { setSearch(e.target.value); setOpenFn(null); }}
-            className="w-full border border-slate-700 bg-slate-900/60 text-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600"
+            className="w-full border border-slate-700/60 bg-[#0d1117] text-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/60 placeholder:text-slate-600"
           />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none whitespace-nowrap">
-          <input type="checkbox" checked={searchCode} onChange={e => setSearchCode(e.target.checked)} className="accent-blue-500" />
-          search code
+        <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none whitespace-nowrap">
+          <input type="checkbox" checked={searchCode} onChange={e => setSearchCode(e.target.checked)} className="accent-blue-500 w-3 h-3" />
+          incl. code
         </label>
-        {groups.length > 0 && (
-          <button
-            onClick={() => setOpenGroups(openGroups.size === groups.length ? new Set() : new Set(groups.map(g => g.key)))}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap"
-          >
-            {openGroups.size === groups.length ? "Collapse all" : "Expand all"}
-          </button>
-        )}
+        <button
+          onClick={() => setOpenGroups(allOpen ? new Set() : new Set(groups.map(g => g.key)))}
+          className="text-xs text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap px-2 py-1 rounded border border-slate-700/40 hover:border-slate-600"
+        >
+          {allOpen ? "Collapse all" : "Expand all"}
+        </button>
       </div>
 
-      {search && (
-        <p className="text-xs text-slate-500 mb-2">
-          {filtered.length} match{filtered.length !== 1 ? "es" : ""} across {groups.length} block{groups.length !== 1 ? "s" : ""}
-          {searchCode ? " (name + code)" : ""}
-        </p>
-      )}
+      {/* Stats strip */}
+      <div className="flex items-center gap-4 px-3 py-1.5 rounded-lg bg-slate-900/40 border border-slate-800/40 text-xs font-mono">
+        <span className="text-slate-400"><span className="text-white font-semibold">{search ? filtered.length : functions.length}</span> fn</span>
+        <span className="text-slate-700">·</span>
+        <span className="text-slate-400"><span className="text-white font-semibold">{groups.length}</span> blocks</span>
+        <span className="text-slate-700">·</span>
+        <span className="text-slate-500">
+          {`0x${minAddr.toString(16).padStart(8, "0")}`}
+          <span className="text-slate-700 mx-1">→</span>
+          {`0x${maxAddr.toString(16).padStart(8, "0")}`}
+        </span>
+        {search && <span className="text-slate-600 ml-auto">&ldquo;{search}&rdquo; · {filtered.length} match{filtered.length !== 1 ? "es" : ""}</span>}
+      </div>
 
-      {/* Tree */}
-      <div className="border border-slate-700/40 rounded-lg overflow-hidden divide-y divide-slate-700/40">
+      {/* Memory block table */}
+      <div className="rounded-xl border border-slate-700/40 overflow-hidden" style={{ background: "#0d1117" }}>
+        {/* Column headers */}
+        <div className="grid grid-cols-[1.5rem_9rem_1fr_4.5rem] gap-0 px-4 py-2 border-b border-slate-800/60 bg-slate-900/30">
+          <span />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Address</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 pl-3">Density</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 text-right">Fn</span>
+        </div>
+
         {groups.length === 0 ? (
-          <p className="text-xs text-slate-500 text-center py-8">
-            No functions match &ldquo;{search}&rdquo;
-          </p>
-        ) : groups.map(({ key, range, items }) => {
-          const isOpen = openGroups.has(key);
-          return (
-            <div key={key}>
-              {/* Group header */}
-              <button
-                onClick={() => toggleGroup(key)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-800/40 transition-colors"
-                style={{ background: "rgba(13,17,23,0.7)" }}
-              >
-                <svg
-                  className={`w-3 h-3 text-slate-500 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-                <span className="font-mono text-xs text-blue-400 font-semibold tracking-wide">{range}</span>
-                <span className="ml-auto text-xs text-slate-600 font-mono">{items.length} fn</span>
-              </button>
+          <p className="text-xs text-slate-600 text-center py-10">No functions match &ldquo;{search}&rdquo;</p>
+        ) : (
+          <div className="divide-y divide-slate-800/40">
+            {groups.map(({ key, items }) => {
+              const isOpen = openGroups.has(key);
+              const { bar: barColor, text: textColor } = densityColor(items.length);
+              const barPct = Math.max(4, Math.round((items.length / maxFn) * 100));
 
-              {/* Function rows */}
-              {isOpen && (
-                <div className="divide-y divide-slate-800/60">
-                  {items.map((fn, idx) => {
-                    const fnKey = `${key}:${idx}`;
-                    const isFnOpen = openFn === fnKey;
-                    return (
-                      <div key={fnKey}>
-                        <button
-                          onClick={() => setOpenFn(isFnOpen ? null : fnKey)}
-                          className="w-full flex items-center gap-3 pl-10 pr-4 py-2 text-left hover:bg-slate-800/30 transition-colors"
-                        >
-                          <svg
-                            className={`w-2.5 h-2.5 text-slate-600 transition-transform flex-shrink-0 ${isFnOpen ? "rotate-90" : ""}`}
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                          >
-                            <polyline points="9 18 15 12 9 6"/>
-                          </svg>
-                          <span className="font-mono text-xs text-slate-300 truncate flex-1 text-left">{fn.name}</span>
-                          <span className="font-mono text-xs text-slate-600 flex-shrink-0">{fn.address}</span>
-                        </button>
-                        {isFnOpen && (
-                          <pre className="bg-[#0a0f1a] text-green-400 text-xs pl-14 pr-4 py-3 overflow-x-auto max-h-72 leading-relaxed whitespace-pre-wrap break-all border-t border-slate-800/60">
-                            {fn.code}
-                          </pre>
-                        )}
+              return (
+                <div key={key}>
+                  {/* Block row */}
+                  <button
+                    onClick={() => toggleGroup(key)}
+                    className="w-full grid grid-cols-[1.5rem_9rem_1fr_4.5rem] gap-0 px-4 py-2.5 items-center text-left hover:bg-slate-800/20 transition-colors group"
+                  >
+                    {/* Expand chevron */}
+                    <svg
+                      className={`w-3 h-3 text-slate-600 group-hover:text-slate-400 transition-all flex-shrink-0 ${isOpen ? "rotate-90" : ""}`}
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+
+                    {/* Start address */}
+                    <span className="font-mono text-xs text-slate-300 tracking-tight">{key}</span>
+
+                    {/* Density bar */}
+                    <div className="flex items-center gap-2 pl-3">
+                      <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden max-w-[160px]">
+                        <div
+                          className={`h-full rounded-full transition-all ${barColor}`}
+                          style={{ width: `${barPct}%` }}
+                        />
                       </div>
-                    );
-                  })}
+                    </div>
+
+                    {/* Count */}
+                    <span className={`text-right text-xs font-mono font-semibold ${textColor}`}>
+                      {items.length}
+                    </span>
+                  </button>
+
+                  {/* Expanded: function list */}
+                  {isOpen && (
+                    <div className="border-t border-slate-800/40 bg-[#080d14]">
+                      {/* Function rows — 2 columns on wider screens */}
+                      <div className="divide-y divide-slate-800/30">
+                        {items.map((fn, idx) => {
+                          const fnKey = `${key}:${idx}`;
+                          const isFnOpen = openFn === fnKey;
+                          return (
+                            <div key={fnKey}>
+                              <button
+                                onClick={() => setOpenFn(isFnOpen ? null : fnKey)}
+                                className="w-full flex items-center gap-3 pl-10 pr-4 py-1.5 text-left hover:bg-slate-800/20 transition-colors group"
+                              >
+                                {/* tiny fn chevron */}
+                                <svg
+                                  className={`w-2.5 h-2.5 flex-shrink-0 transition-all ${isFnOpen ? "rotate-90 text-blue-400" : "text-slate-700 group-hover:text-slate-500"}`}
+                                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                                >
+                                  <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                                {/* address */}
+                                <span className="font-mono text-[11px] text-slate-600 flex-shrink-0 w-24">{fn.address}</span>
+                                {/* name */}
+                                <span className="font-mono text-[11px] text-slate-300 truncate flex-1">
+                                  {fn.name}
+                                </span>
+                                {/* line count hint */}
+                                {fn.code && (
+                                  <span className="text-[10px] text-slate-700 flex-shrink-0 font-mono">
+                                    {fn.code.split("\n").length}L
+                                  </span>
+                                )}
+                              </button>
+                              {isFnOpen && (
+                                <pre className="text-[11px] leading-relaxed font-mono text-emerald-300/90 bg-[#060b10] pl-16 pr-4 py-3 overflow-x-auto max-h-80 whitespace-pre-wrap break-all border-t border-slate-800/40">
+                                  {fn.code || "(no pseudocode)"}
+                                </pre>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
