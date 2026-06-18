@@ -1,14 +1,22 @@
 import type { RiskLevel } from "@/lib/api";
 
-const styles: Record<string, string> = {
-  critical:      "bg-red-900/50 text-red-300 border border-red-700/60",
-  high:          "bg-orange-900/50 text-orange-300 border border-orange-700/60",
-  medium:        "bg-yellow-900/40 text-yellow-300 border border-yellow-700/50",
-  low:           "bg-green-900/40 text-green-300 border border-green-800/50",
-  informational: "bg-sky-900/40 text-sky-300 border border-sky-800/50",
+const CHIP: Record<string, string> = {
+  critical:      "text-red-400     border-red-500/30     bg-red-500/10",
+  high:          "text-orange-400  border-orange-500/30  bg-orange-500/10",
+  medium:        "text-amber-400   border-amber-500/30   bg-amber-500/10",
+  low:           "text-emerald-400 border-emerald-600/30 bg-emerald-500/10",
+  informational: "text-slate-400   border-slate-600/40   bg-slate-500/10",
 };
 
-const labels: Record<string, string> = {
+const DOT: Record<string, string> = {
+  critical:      "bg-red-500",
+  high:          "bg-orange-500",
+  medium:        "bg-amber-500",
+  low:           "bg-emerald-500",
+  informational: "bg-slate-500",
+};
+
+const LABELS: Record<string, string> = {
   critical:      "CRITICAL",
   high:          "HIGH",
   medium:        "MEDIUM",
@@ -16,25 +24,21 @@ const labels: Record<string, string> = {
   informational: "INFO",
 };
 
-interface Props {
-  level: RiskLevel | string;
-  score?: number | null;
-  large?: boolean;
-}
+interface Props { level: RiskLevel | string; score?: number | null; large?: boolean; }
 
 export default function RiskBadge({ level, score, large }: Props) {
-  const cls = styles[level] ?? "bg-slate-800 text-slate-400 border border-slate-700";
-  const label = labels[level] ?? level.toUpperCase();
+  const chipCls = CHIP[level] ?? "text-slate-400 border-slate-600/40 bg-slate-500/10";
+  const dotCls  = DOT[level]  ?? "bg-slate-500";
+  const label   = LABELS[level] ?? level.toUpperCase();
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-md font-semibold ${
-        large ? "px-3 py-1 text-sm" : "px-2 py-0.5 text-xs"
-      } ${cls}`}
-    >
+    <span className={`inline-flex items-center gap-1.5 rounded-md border font-semibold ${
+      large ? "px-3 py-1 text-sm" : "px-2 py-0.5 text-xs"
+    } ${chipCls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotCls}`} />
       {label}
       {score != null && (
-        <span className="opacity-70 font-normal">{Math.round(score)}/100</span>
+        <span className="opacity-60 font-normal">{Math.round(score)}</span>
       )}
     </span>
   );

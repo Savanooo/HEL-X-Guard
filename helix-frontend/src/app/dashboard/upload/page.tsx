@@ -1,10 +1,18 @@
 "use client";
 import { useState, useRef, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
+import { UploadCloud, FileCode2, Lock, Search, Zap, BarChart3 } from "lucide-react";
 import { createScan } from "@/lib/api";
 import Spinner from "@/components/Spinner";
 
 const ALLOWED_EXTS = [".bin", ".fw", ".img", ".hex", ".rom", ".elf", ".axf", ".srec"];
+
+const INFO_ITEMS = [
+  { Icon: Lock,      text: "Never executed — static analysis only" },
+  { Icon: Search,    text: "Extracts strings, entropy, YARA, binwalk" },
+  { Icon: Zap,       text: "Results ready in seconds" },
+  { Icon: BarChart3, text: "Risk score 0–100 with findings breakdown" },
+];
 
 export default function UploadPage() {
   const router = useRouter();
@@ -53,11 +61,8 @@ export default function UploadPage() {
 
   return (
     <div className="max-w-xl mx-auto">
-      {/* Header */}
-      <h1 className="text-xl font-bold text-white mb-1">New Scan</h1>
-      <p className="text-slate-500 text-sm mb-8">
-        Upload a firmware binary for static security analysis.
-      </p>
+      <h1 className="text-[15px] font-semibold text-slate-100 mb-0.5">New Scan</h1>
+      <p className="text-slate-500 text-sm mb-8">Upload a firmware binary for static security analysis.</p>
 
       {/* Drop zone */}
       <div
@@ -67,10 +72,10 @@ export default function UploadPage() {
         onClick={() => inputRef.current?.click()}
         className={`relative cursor-pointer border-2 border-dashed rounded-2xl p-12 text-center transition-all ${
           dragging
-            ? "border-blue-500 bg-blue-950/30"
+            ? "border-brand-500 bg-brand-500/5"
             : file
-            ? "border-emerald-500 bg-emerald-950/20"
-            : "border-slate-700 bg-transparent hover:border-slate-500 hover:bg-slate-800/30"
+            ? "border-emerald-500 bg-emerald-500/5"
+            : "border-[#2d3a54] hover:border-[#3d4f6e]"
         }`}
       >
         <input
@@ -83,26 +88,22 @@ export default function UploadPage() {
 
         {file ? (
           <div className="space-y-2">
-            <div className="text-4xl">📦</div>
-            <p className="font-semibold text-slate-200">{file.name}</p>
+            <FileCode2 className="mx-auto text-emerald-400" size={40} strokeWidth={1.25} />
+            <p className="font-semibold text-slate-200 text-[15px]">{file.name}</p>
             <p className="text-slate-400 text-sm">{fmtSize(file.size)}</p>
             <button
               onClick={(e) => { e.stopPropagation(); setFile(null); }}
-              className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+              className="text-xs text-slate-500 hover:text-red-400 transition-colors mt-1"
             >
               Remove
             </button>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="text-5xl opacity-20">📂</div>
+            <UploadCloud className="mx-auto text-slate-600" size={48} strokeWidth={1} />
             <div>
-              <p className="font-semibold text-slate-300">
-                Drop firmware file here
-              </p>
-              <p className="text-slate-500 text-sm mt-0.5">
-                or click to browse
-              </p>
+              <p className="font-semibold text-slate-300 text-[15px]">Drop firmware file here</p>
+              <p className="text-slate-500 text-sm mt-0.5">or click to browse</p>
             </div>
             <p className="text-xs text-slate-600">
               Supported: {ALLOWED_EXTS.join("  ")} · Max 500 MB
@@ -113,21 +114,20 @@ export default function UploadPage() {
 
       {/* Error */}
       {error && (
-        <div className="mt-4 bg-red-950/40 border border-red-800/40 text-red-300 rounded-xl px-4 py-3 text-sm">
+        <div className="mt-4 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl px-4 py-3 text-sm">
           {error}
         </div>
       )}
 
       {/* Info boxes */}
-      <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-slate-500">
-        {[
-          { icon: "🔒", text: "File is never executed — static analysis only" },
-          { icon: "🔍", text: "Extracts strings, entropy, YARA, binwalk findings" },
-          { icon: "⚡", text: "Results ready in seconds (may take longer for large files)" },
-          { icon: "📊", text: "Risk score 0–100 with detailed findings breakdown" },
-        ].map(({ icon, text }) => (
-          <div key={text} className="flex items-start gap-2 bg-slate-800/60 border border-slate-700/40 rounded-xl px-3 py-2.5">
-            <span>{icon}</span>
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        {INFO_ITEMS.map(({ Icon, text }) => (
+          <div
+            key={text}
+            className="flex items-start gap-2.5 border border-[#1f2840] rounded-xl px-3 py-2.5 text-xs text-slate-500"
+            style={{ background: "#121826" }}
+          >
+            <Icon size={13} className="text-slate-600 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
             <span>{text}</span>
           </div>
         ))}
@@ -137,12 +137,12 @@ export default function UploadPage() {
       <button
         onClick={handleSubmit}
         disabled={!file || uploading}
-        className="mt-6 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-colors"
+        className="mt-6 w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-colors"
       >
         {uploading ? (
           <>
             <Spinner size={16} />
-            Uploading & starting scan…
+            Uploading &amp; starting scan…
           </>
         ) : (
           "Start Analysis →"

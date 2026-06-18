@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { Shield, RefreshCw, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { listScans, deleteScan, type Scan, type ScanList } from "@/lib/api";
 import RiskBadge from "@/components/RiskBadge";
 import StatusBadge from "@/components/StatusBadge";
@@ -22,11 +23,16 @@ function fmtSize(bytes: number | null) {
 
 interface Stats { total: number; critical: number; high: number; medium: number; low: number; }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({
+  label, value, borderColor, valueColor,
+}: { label: string; value: number; borderColor: string; valueColor?: string }) {
   return (
-    <div className={`rounded-xl px-5 py-4 border ${color}`} style={{ background: "#161b27" }}>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      <p className="text-xs text-slate-500 mt-0.5 font-medium uppercase tracking-wide">{label}</p>
+    <div
+      className={`rounded-xl px-5 py-4 border shadow-card ${borderColor}`}
+      style={{ background: "#121826" }}
+    >
+      <p className={`text-2xl font-bold ${valueColor ?? "text-white"}`}>{value}</p>
+      <p className="text-[11px] text-slate-500 mt-1 font-semibold uppercase tracking-[0.08em]">{label}</p>
     </div>
   );
 }
@@ -50,7 +56,6 @@ export default function DashboardPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Load summary stats once on mount
   useEffect(() => {
     Promise.all([
       listScans(1, 1),
@@ -59,13 +64,7 @@ export default function DashboardPage() {
       listScans(1, 1, "medium"),
       listScans(1, 1, "low"),
     ]).then(([all, crit, high, med, low]) => {
-      setStats({
-        total: all.total,
-        critical: crit.total,
-        high: high.total,
-        medium: med.total,
-        low: low.total,
-      });
+      setStats({ total: all.total, critical: crit.total, high: high.total, medium: med.total, low: low.total });
     }).catch(() => {});
   }, []);
 
@@ -82,41 +81,40 @@ export default function DashboardPage() {
     }
   }
 
+  const selectCls = "border border-[#1f2840] bg-[#0b0f1a] rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition-colors";
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Scan History</h1>
+          <h1 className="text-[15px] font-semibold text-slate-100">Scan History</h1>
           {data && (
-            <p className="text-slate-500 text-sm mt-0.5">{data.total} total scans</p>
+            <p className="text-slate-500 text-xs mt-0.5">{data.total} total scans</p>
           )}
         </div>
         <Link
           href="/dashboard/upload"
-          className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          className="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
         >
-          <span className="text-base leading-none">+</span> New Scan
+          <Plus size={14} strokeWidth={2.5} />
+          New Scan
         </Link>
       </div>
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <StatCard label="Total Scans" value={stats.total} color="border-slate-700/60" />
-          <StatCard label="Critical + High" value={stats.critical + stats.high} color="border-red-700/50" />
-          <StatCard label="Medium" value={stats.medium} color="border-yellow-700/50" />
-          <StatCard label="Low / Info" value={stats.low} color="border-green-800/50" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Total Scans"    value={stats.total}                  borderColor="border-[#1f2840]" />
+          <StatCard label="Critical / High" value={stats.critical + stats.high} borderColor="border-red-500/30"    valueColor="text-red-400" />
+          <StatCard label="Medium"          value={stats.medium}                borderColor="border-amber-500/30"  valueColor="text-amber-400" />
+          <StatCard label="Low / Info"      value={stats.low}                   borderColor="border-slate-600/40" />
         </div>
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <select
-          value={riskFilter}
-          onChange={(e) => { setRiskFilter(e.target.value); setPage(1); }}
-          className="border border-slate-700 bg-slate-900/60 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+      <div className="flex flex-wrap gap-2">
+        <select value={riskFilter} onChange={(e) => { setRiskFilter(e.target.value); setPage(1); }} className={selectCls}>
           <option value="">All Risk Levels</option>
           <option value="critical">Critical</option>
           <option value="high">High</option>
@@ -124,11 +122,7 @@ export default function DashboardPage() {
           <option value="low">Low</option>
           <option value="informational">Informational</option>
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="border border-slate-700 bg-slate-900/60 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className={selectCls}>
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
           <option value="running">Running</option>
@@ -137,9 +131,10 @@ export default function DashboardPage() {
         </select>
         <button
           onClick={load}
-          className="border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm px-3 py-1.5 rounded-lg transition-colors"
+          className="inline-flex items-center gap-1.5 border border-[#1f2840] bg-[#121826] hover:bg-[#161d2e] hover:border-[#2d3a54] text-slate-400 text-sm px-3 py-1.5 rounded-lg transition-colors"
         >
-          ↻ Refresh
+          <RefreshCw size={13} />
+          Refresh
         </button>
       </div>
 
@@ -150,47 +145,48 @@ export default function DashboardPage() {
         </div>
       ) : data?.items.length === 0 ? (
         <div className="text-center py-20 text-slate-500">
-          <p className="text-4xl mb-3">🛡</p>
-          <p className="text-lg font-medium text-slate-400">No scans yet</p>
+          <Shield size={40} className="mx-auto mb-3 text-slate-700" strokeWidth={1} />
+          <p className="text-[15px] font-semibold text-slate-400">No scans yet</p>
           <p className="text-sm mt-1">Upload a firmware file to run your first analysis</p>
           <Link
             href="/dashboard/upload"
-            className="inline-block mt-4 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 mt-4 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
           >
+            <Plus size={14} strokeWidth={2.5} />
             Upload Firmware
           </Link>
         </div>
       ) : (
         <>
-          <div className="border border-slate-700/60 rounded-xl overflow-hidden" style={{ background: "#161b27" }}>
+          <div className="border border-[#1f2840] rounded-xl overflow-hidden shadow-card" style={{ background: "#121826" }}>
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-700/60" style={{ background: "#0d1117" }}>
+              <thead className="border-b border-[#1f2840]" style={{ background: "#0b0f1a" }}>
                 <tr>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">File</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Size</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Risk</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Status</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Date</th>
-                  <th className="px-5 py-3"></th>
+                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-[10px] uppercase tracking-[0.08em]">File</th>
+                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-[10px] uppercase tracking-[0.08em]">Size</th>
+                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-[10px] uppercase tracking-[0.08em]">Risk</th>
+                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-[10px] uppercase tracking-[0.08em]">Status</th>
+                  <th className="text-left px-5 py-3 font-semibold text-slate-500 text-[10px] uppercase tracking-[0.08em]">Date</th>
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/40">
+              <tbody className="divide-y divide-[#1f2840]">
                 {data!.items.map((scan) => (
-                  <tr key={scan.id} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={scan.id} className="hover:bg-[#161d2e] transition-colors">
                     <td className="px-5 py-3.5">
                       <Link
                         href={`/dashboard/${scan.id}`}
-                        className="font-medium text-blue-400 hover:text-blue-300 block truncate max-w-[240px]"
+                        className="font-medium text-brand-400 hover:text-brand-300 block truncate max-w-[240px] transition-colors"
                       >
                         {scan.filename}
                       </Link>
                       {scan.sha256 && (
-                        <p className="text-xs text-slate-600 font-mono mt-0.5">
+                        <p className="text-[11px] text-slate-600 font-mono mt-0.5 tracking-tight">
                           {scan.sha256.slice(0, 16)}…
                         </p>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-slate-400">{fmtSize(scan.file_size)}</td>
+                    <td className="px-5 py-3.5 text-slate-400 text-[13px]">{fmtSize(scan.file_size)}</td>
                     <td className="px-5 py-3.5">
                       {scan.risk_level ? (
                         <RiskBadge level={scan.risk_level} score={scan.risk_score} />
@@ -201,14 +197,14 @@ export default function DashboardPage() {
                     <td className="px-5 py-3.5">
                       <StatusBadge status={scan.status} />
                     </td>
-                    <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap text-xs">
+                    <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap text-[11px] font-mono">
                       {fmtDate(scan.created_at)}
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-3">
                         <Link
                           href={`/dashboard/${scan.id}`}
-                          className="text-xs text-blue-400 hover:text-blue-300 font-medium"
+                          className="text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors"
                         >
                           View →
                         </Link>
@@ -218,7 +214,7 @@ export default function DashboardPage() {
                           className="text-xs text-slate-600 hover:text-red-400 disabled:opacity-30 transition-colors"
                           title="Delete scan"
                         >
-                          {deletingId === scan.id ? <Spinner size={12} /> : "✕"}
+                          {deletingId === scan.id ? <Spinner size={12} /> : "×"}
                         </button>
                       </div>
                     </td>
@@ -230,25 +226,24 @@ export default function DashboardPage() {
 
           {/* Pagination */}
           {data!.total > 20 && (
-            <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
-              <span>
-                Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, data!.total)} of{" "}
-                {data!.total}
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <span className="text-xs">
+                {(page - 1) * 20 + 1}–{Math.min(page * 20, data!.total)} of {data!.total}
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 border border-slate-700 bg-slate-800 hover:bg-slate-700 rounded-lg disabled:opacity-40 transition-colors text-slate-400"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#1f2840] bg-[#121826] hover:bg-[#161d2e] rounded-lg disabled:opacity-40 transition-colors text-slate-400 text-xs"
                 >
-                  ← Prev
+                  <ChevronLeft size={13} /> Prev
                 </button>
                 <button
                   onClick={() => setPage((p) => p + 1)}
                   disabled={page * 20 >= data!.total}
-                  className="px-3 py-1.5 border border-slate-700 bg-slate-800 hover:bg-slate-700 rounded-lg disabled:opacity-40 transition-colors text-slate-400"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#1f2840] bg-[#121826] hover:bg-[#161d2e] rounded-lg disabled:opacity-40 transition-colors text-slate-400 text-xs"
                 >
-                  Next →
+                  Next <ChevronRight size={13} />
                 </button>
               </div>
             </div>

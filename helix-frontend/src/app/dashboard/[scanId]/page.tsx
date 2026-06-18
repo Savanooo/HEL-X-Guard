@@ -51,9 +51,12 @@ function dedupeStrings(arr: { identifier: string; data: string }[]) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl overflow-hidden border border-slate-700/60" style={{ background: "#161b27" }}>
-      <div className="px-5 py-3 border-b border-slate-700/50">
-        <h2 className="font-semibold text-slate-300 text-sm tracking-tight">{title}</h2>
+    <div
+      className="rounded-xl overflow-hidden border border-[#1f2840] shadow-card"
+      style={{ background: "#121826" }}
+    >
+      <div className="px-5 py-3 border-b border-[#1f2840]">
+        <h2 className="font-semibold text-slate-300 text-[13px] tracking-tight">{title}</h2>
       </div>
       <div className="p-5">{children}</div>
     </div>
@@ -62,7 +65,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function KV({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
-    <div className="flex gap-4 py-2.5 border-b border-slate-700/40 last:border-0">
+    <div className="flex gap-4 py-2.5 border-b border-[#1f2840] last:border-0">
       <dt className="w-24 flex-shrink-0 text-xs font-semibold text-slate-500 uppercase tracking-wider pt-0.5">
         {label}
       </dt>
@@ -215,7 +218,7 @@ export default function ScanDetailPage() {
             <>
               <a
                 href={`/dashboard/diff?a=${scanId}`}
-                className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
+                className="flex items-center gap-2 bg-[#121826] border border-[#1f2840] hover:bg-[#161d2e] hover:border-[#2d3a54] text-slate-300 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 Compare
@@ -223,7 +226,7 @@ export default function ScanDetailPage() {
               <button
                 onClick={handleDownloadPdf}
                 disabled={downloadingPdf}
-                className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
+                className="flex items-center gap-2 bg-[#121826] border border-[#1f2840] hover:bg-[#161d2e] hover:border-[#2d3a54] disabled:opacity-50 text-slate-300 text-xs font-medium px-3.5 py-2 rounded-lg transition-colors"
               >
                 {downloadingPdf ? <Spinner size={13} /> : (
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -239,7 +242,7 @@ export default function ScanDetailPage() {
 
       {/* Pending / Running banner */}
       {(scan.status === "pending" || scan.status === "running") && (
-        <div className="flex items-center gap-3 bg-blue-950/40 border border-blue-800/40 rounded-xl px-5 py-4 text-blue-300">
+        <div className="flex items-center gap-3 bg-amber-500/8 border border-amber-500/25 rounded-xl px-5 py-4 text-amber-300">
           <Spinner size={18} />
           <div>
             <p className="font-semibold text-sm">
@@ -265,15 +268,15 @@ export default function ScanDetailPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Risk card */}
-            <div className={`rounded-xl overflow-hidden border-2 ${
-              scan.risk_level === "critical" ? "border-red-500" :
-              scan.risk_level === "high"     ? "border-orange-400" :
-              scan.risk_level === "medium"   ? "border-yellow-400" :
-              scan.risk_level === "low"      ? "border-green-500" :
-                                               "border-slate-700"
-            }`} style={{ background: "#161b27" }}>
-              <div className="px-5 py-3 border-b border-slate-700/50">
-                <h2 className="font-semibold text-slate-300 text-sm tracking-tight">Risk Assessment</h2>
+            <div className={`rounded-xl overflow-hidden border shadow-card ${
+              scan.risk_level === "critical" ? "border-red-500/40" :
+              scan.risk_level === "high"     ? "border-orange-500/40" :
+              scan.risk_level === "medium"   ? "border-amber-500/40" :
+              scan.risk_level === "low"      ? "border-emerald-500/40" :
+                                               "border-[#1f2840]"
+            }`} style={{ background: "#121826" }}>
+              <div className="px-5 py-3 border-b border-[#1f2840]">
+                <h2 className="font-semibold text-slate-300 text-[13px] tracking-tight">Risk Assessment</h2>
               </div>
               <div className="p-5">
                 <div className="flex flex-col items-center mb-4">
@@ -292,7 +295,7 @@ export default function ScanDetailPage() {
                         <span className={`mt-0.5 text-base leading-none ${
                           r.toLowerCase().includes("critical") || r.toLowerCase().includes("safety") || r.toLowerCase().includes("unsigned") ? "text-red-400" :
                           r.toLowerCase().includes("high") || r.toLowerCase().includes("flash") || r.toLowerCase().includes("hidden") ? "text-orange-400" :
-                          r.toLowerCase().includes("medium") || r.toLowerCase().includes("debug") ? "text-yellow-400" :
+                          r.toLowerCase().includes("medium") || r.toLowerCase().includes("debug") ? "text-amber-400" :
                           "text-slate-500"
                         }`}>›</span>
                         {r}
@@ -333,7 +336,7 @@ export default function ScanDetailPage() {
             title={`Findings — ${suspicious.length} strings · ${yaraMatches.length} YARA · ${binwalkFindings.length} binwalk`}
           >
             {/* Tab bar */}
-            <div className="flex gap-1 mb-5 border-b border-slate-700/50 pb-0">
+            <div className="flex gap-1 mb-5 border-b border-[#1f2840] pb-0">
               {(
                 [
                   ["strings", "Strings", suspicious.length],
@@ -353,8 +356,8 @@ export default function ScanDetailPage() {
                 >
                   {label}
                   {count !== null && (
-                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                      tab === t ? "bg-blue-900/50 text-blue-400" : "bg-slate-800 text-slate-500"
+                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded font-semibold ${
+                      tab === t ? "bg-brand-500/15 text-brand-400" : "bg-[#1f2840] text-slate-500"
                     }`}>{count}</span>
                   )}
                 </button>
@@ -368,10 +371,10 @@ export default function ScanDetailPage() {
                   <p className="text-sm">No suspicious strings found.</p>
                 </div>
               ) : (
-                <div className="rounded-lg border border-slate-700/40 overflow-hidden">
-                  <div className="max-h-[480px] overflow-y-auto divide-y divide-slate-700/30">
+                <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                  <div className="max-h-[480px] overflow-y-auto divide-y divide-[#1f2840]">
                     {suspicious.map((s, i) => (
-                      <div key={i} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-800/40 transition-colors">
+                      <div key={i} className="flex items-center gap-3 px-3 py-2 hover:bg-[#161d2e] transition-colors">
                         <span className="w-32 flex-shrink-0">
                           <CategoryBadge cat={s.category} />
                         </span>
@@ -399,10 +402,10 @@ export default function ScanDetailPage() {
                   {yaraMatches.map((m, i) => {
                     const sev = (m.severity ?? "low").toLowerCase();
                     const borderCls =
-                      sev === "critical" ? "border-l-red-500 bg-red-950/20" :
-                      sev === "high"     ? "border-l-orange-400 bg-orange-950/20" :
-                      sev === "medium"   ? "border-l-yellow-400 bg-yellow-950/20" :
-                                           "border-l-slate-600 bg-slate-800/20";
+                      sev === "critical" ? "border-l-[#ef4444] bg-red-500/5" :
+                      sev === "high"     ? "border-l-[#f97316] bg-orange-500/5" :
+                      sev === "medium"   ? "border-l-[#f59e0b] bg-amber-500/5" :
+                                           "border-l-[#1f2840]";
                     const deduped = m.strings ? dedupeStrings(m.strings) : [];
                     // Only show printable string matches, skip binary-only hits
                     const printable = deduped.filter(s => {
@@ -410,7 +413,7 @@ export default function ScanDetailPage() {
                       return !cleaned.startsWith("\\x") && cleaned.length > 0;
                     });
                     return (
-                      <div key={i} className={`border border-l-4 border-slate-700/40 rounded-lg p-4 ${borderCls}`}>
+                      <div key={i} className={`border border-l-[3px] border-[#1f2840] rounded-lg p-4 ${borderCls}`}>
                         <div className="flex items-center justify-between gap-3 mb-2">
                           <span className="font-semibold text-slate-200 text-sm">{m.rule}</span>
                           {m.severity && <CategoryBadge cat={m.severity.toUpperCase()} />}
@@ -418,9 +421,9 @@ export default function ScanDetailPage() {
                         {printable.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-1">
                             {printable.map((s, j) => (
-                              <code key={j} className="inline-flex items-center gap-1 text-xs bg-slate-900/60 border border-slate-700 rounded px-2 py-0.5 font-mono">
-                                <span className="text-slate-500">{s.identifier}:</span>
-                                <span className="text-slate-200 font-semibold">{cleanYaraData(s.data)}</span>
+                              <code key={j} className="inline-flex items-center gap-1 text-xs bg-[#0b0f1a] border border-[#2d3a54] rounded px-2 py-0.5 font-mono">
+                                <span className="text-slate-600">{s.identifier}</span>
+                                <span className="text-emerald-300/90 font-medium">{cleanYaraData(s.data)}</span>
                               </code>
                             ))}
                           </div>
@@ -445,7 +448,7 @@ export default function ScanDetailPage() {
                   {binwalkFindings.map((f, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-4 py-1.5 border-b border-slate-700/30 last:border-0 text-sm"
+                      className="flex items-start gap-4 py-1.5 border-b border-[#1f2840] last:border-0 text-sm"
                     >
                       <span className="font-mono text-xs text-slate-500 w-20 flex-shrink-0">
                         0x{(f.offset ?? 0).toString(16).padStart(6, "0")}
@@ -477,7 +480,7 @@ export default function ScanDetailPage() {
             {/* Action bar — horizontal rows */}
             <div className="space-y-2 mb-5">
               {/* Binwalk row */}
-              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "rgba(13,17,23,0.5)" }}>
+              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "#0b0f1a" }}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <p className="text-sm font-semibold text-slate-200">Binwalk Extraction</p>
@@ -498,7 +501,7 @@ export default function ScanDetailPage() {
               </div>
 
               {/* Ghidra row */}
-              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "rgba(13,17,23,0.5)" }}>
+              <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-700/40" style={{ background: "#0b0f1a" }}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <p className="text-sm font-semibold text-slate-200">Ghidra Decompile</p>
@@ -540,7 +543,7 @@ export default function ScanDetailPage() {
       {/* Processor selection modal */}
       {showProcessorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-700" style={{ background: "#161b27" }}>
+          <div className="rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 border border-[#2d3a54]" style={{ background: "#161d2e" }}>
             <h3 className="text-base font-semibold text-slate-200 mb-1">Ghidra Decompile Settings</h3>
             <p className="text-xs text-slate-500 mb-4">
               For ELF/PE binaries, leave processor as Auto. For raw firmware (STM32, MIPS, etc.) select the CPU architecture.
@@ -550,7 +553,7 @@ export default function ScanDetailPage() {
             <select
               value={selectedProcessor}
               onChange={e => setSelectedProcessor(e.target.value)}
-              className="w-full border border-slate-700 bg-slate-900/60 rounded-lg px-3 py-2 text-sm text-slate-200 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-[#1f2840] bg-[#0b0f1a] rounded-lg px-3 py-2 text-sm text-slate-200 mb-4 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             >
               <option value="">Auto (ELF / PE only)</option>
               <option value="ARM:LE:32:Cortex">ARM Cortex-M LE 32-bit — STM32, NXP, etc.</option>
@@ -570,13 +573,13 @@ export default function ScanDetailPage() {
               value={baseAddress}
               onChange={e => setBaseAddress(e.target.value)}
               placeholder="e.g. 0x08000000"
-              className="w-full border border-slate-700 bg-slate-900/60 rounded-lg px-3 py-2 text-sm font-mono text-slate-200 mb-5 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-600"
+              className="w-full border border-[#1f2840] bg-[#0b0f1a] rounded-lg px-3 py-2 text-sm font-mono text-slate-200 mb-5 focus:outline-none focus:ring-2 focus:ring-brand-500/40 placeholder:text-slate-600"
             />
 
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setShowProcessorModal(false)}
-                className="px-4 py-2 text-sm text-slate-400 hover:bg-slate-800 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-slate-400 hover:bg-[#1f2840] rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -616,7 +619,7 @@ function ExtractionResults({ extraction }: { extraction: Record<string, unknown>
       {findings.length > 0 ? (
         <div>
           <p className="text-xs font-medium text-slate-400 mb-1">{findings.length} signature(s) detected</p>
-          <div className="max-h-36 overflow-y-auto space-y-0.5 bg-slate-900/60 rounded-lg px-2 py-1.5">
+          <div className="max-h-36 overflow-y-auto space-y-0.5 bg-[#0b0f1a] rounded-lg px-2 py-1.5">
             {findings.map((f, i) => (
               <div key={i} className="flex gap-2 text-xs">
                 <span className="font-mono text-slate-500 w-20 flex-shrink-0">{f.hex_offset}</span>
@@ -635,7 +638,7 @@ function ExtractionResults({ extraction }: { extraction: Record<string, unknown>
           <p className="text-xs font-medium text-slate-400 mb-1">{files.length} file(s) extracted</p>
           <div className="max-h-48 overflow-y-auto space-y-1">
             {files.map((f, i) => (
-              <div key={i} className="border border-slate-700/40 rounded-lg p-2 text-xs">
+              <div key={i} className="border border-[#1f2840] rounded-lg p-2 text-xs">
                 <p className="font-mono text-slate-200 font-medium truncate">{f.name}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-0.5 text-slate-500">
                   {f.size != null && <span>{fmtSize(f.size)}</span>}
@@ -733,7 +736,7 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
             placeholder={`Search ${functions.length} functions…`}
             value={search}
             onChange={e => { setSearch(e.target.value); setOpenFn(null); }}
-            className="w-full border border-slate-700/60 bg-[#0d1117] text-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/60 placeholder:text-slate-600"
+            className="w-full border border-[#1f2840] bg-[#0b0f1a] text-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500/40 placeholder:text-slate-600"
           />
         </div>
         <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none whitespace-nowrap">
@@ -742,14 +745,14 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
         </label>
         <button
           onClick={() => setOpenGroups(allOpen ? new Set() : new Set(groups.map(g => g.key)))}
-          className="text-xs text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap px-2 py-1 rounded border border-slate-700/40 hover:border-slate-600"
+          className="text-xs text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap px-2 py-1 rounded border border-[#1f2840] hover:border-[#2d3a54]"
         >
           {allOpen ? "Collapse all" : "Expand all"}
         </button>
       </div>
 
       {/* Stats strip */}
-      <div className="flex items-center gap-4 px-3 py-1.5 rounded-lg bg-slate-900/40 border border-slate-800/40 text-xs font-mono">
+      <div className="flex items-center gap-4 px-3 py-1.5 rounded-lg bg-[#0b0f1a] border border-[#1f2840] text-xs font-mono">
         <span className="text-slate-400"><span className="text-white font-semibold">{search ? filtered.length : functions.length}</span> fn</span>
         <span className="text-slate-700">·</span>
         <span className="text-slate-400"><span className="text-white font-semibold">{groups.length}</span> blocks</span>
@@ -763,9 +766,9 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
       </div>
 
       {/* Memory block table */}
-      <div className="rounded-xl border border-slate-700/40 overflow-hidden" style={{ background: "#0d1117" }}>
+      <div className="rounded-xl border border-[#1f2840] overflow-hidden" style={{ background: "#0b0f1a" }}>
         {/* Column headers */}
-        <div className="grid grid-cols-[1.5rem_9rem_1fr_4.5rem] gap-0 px-4 py-2 border-b border-slate-800/60 bg-slate-900/30">
+        <div className="grid grid-cols-[1.5rem_9rem_1fr_4.5rem] gap-0 px-4 py-2 border-b border-[#1f2840]" style={{ background: "#121826" }}>
           <span />
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Address</span>
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 pl-3">Density</span>
@@ -775,7 +778,7 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
         {groups.length === 0 ? (
           <p className="text-xs text-slate-600 text-center py-10">No functions match &ldquo;{search}&rdquo;</p>
         ) : (
-          <div className="divide-y divide-slate-800/40">
+          <div className="divide-y divide-[#1f2840]">
             {groups.map(({ key, items }) => {
               const isOpen = openGroups.has(key);
               const { bar: barColor, text: textColor } = densityColor(items.length);
@@ -786,7 +789,7 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
                   {/* Block row */}
                   <button
                     onClick={() => toggleGroup(key)}
-                    className="w-full grid grid-cols-[1.5rem_9rem_1fr_4.5rem] gap-0 px-4 py-2.5 items-center text-left hover:bg-slate-800/20 transition-colors group"
+                    className="w-full grid grid-cols-[1.5rem_9rem_1fr_4.5rem] gap-0 px-4 py-2.5 items-center text-left hover:bg-[#161d2e]/60 transition-colors group"
                   >
                     {/* Expand chevron */}
                     <svg
@@ -801,7 +804,7 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
 
                     {/* Density bar */}
                     <div className="flex items-center gap-2 pl-3">
-                      <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden max-w-[160px]">
+                      <div className="flex-1 h-1.5 bg-[#1f2840] rounded-full overflow-hidden max-w-[160px]">
                         <div
                           className={`h-full rounded-full transition-all ${barColor}`}
                           style={{ width: `${barPct}%` }}
@@ -817,9 +820,9 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
 
                   {/* Expanded: function list */}
                   {isOpen && (
-                    <div className="border-t border-slate-800/40 bg-[#080d14]">
+                    <div className="border-t border-[#1f2840] bg-[#080c14]">
                       {/* Function rows — 2 columns on wider screens */}
-                      <div className="divide-y divide-slate-800/30">
+                      <div className="divide-y divide-[#1a2234]">
                         {items.map((fn, idx) => {
                           const fnKey = `${key}:${idx}`;
                           const isFnOpen = openFn === fnKey;
@@ -827,7 +830,7 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
                             <div key={fnKey}>
                               <button
                                 onClick={() => setOpenFn(isFnOpen ? null : fnKey)}
-                                className="w-full flex items-center gap-3 pl-10 pr-4 py-1.5 text-left hover:bg-slate-800/20 transition-colors group"
+                                className="w-full flex items-center gap-3 pl-10 pr-4 py-1.5 text-left hover:bg-[#161d2e]/60 transition-colors group"
                               >
                                 {/* tiny fn chevron */}
                                 <svg
@@ -850,7 +853,7 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
                                 )}
                               </button>
                               {isFnOpen && (
-                                <pre className="text-[11px] leading-relaxed font-mono text-emerald-300/90 bg-[#060b10] pl-16 pr-4 py-3 overflow-x-auto max-h-80 whitespace-pre-wrap break-all border-t border-slate-800/40">
+                                <pre className="text-[11px] leading-relaxed font-mono text-emerald-300/90 bg-[#060b10] pl-16 pr-4 py-3 overflow-x-auto max-h-80 whitespace-pre-wrap break-all border-t border-[#1f2840]">
                                   {fn.code || "(no pseudocode)"}
                                 </pre>
                               )}
@@ -877,13 +880,13 @@ function JobStatusPill({ status }: { status?: string | null }) {
     return <span className="text-xs text-slate-400">Not run</span>;
   }
   const styles: Record<string, string> = {
-    pending:   "bg-slate-800 text-slate-400",
-    running:   "bg-blue-900/50 text-blue-300",
-    completed: "bg-emerald-900/50 text-emerald-400",
-    failed:    "bg-red-900/50 text-red-400",
+    pending:   "bg-slate-500/10 text-slate-400 border border-slate-600/30",
+    running:   "bg-amber-500/10 text-amber-400 border border-amber-500/30",
+    completed: "bg-emerald-500/10 text-emerald-400 border border-emerald-600/30",
+    failed:    "bg-red-500/10 text-red-400 border border-red-500/30",
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-slate-100 text-slate-600"}`}>
+    <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-slate-500/10 text-slate-400 border-slate-600/30"}`}>
       {status === "running" && <Spinner size={10} />}
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
@@ -893,32 +896,32 @@ function JobStatusPill({ status }: { status?: string | null }) {
 // ── Category badge ────────────────────────────────────────────────────────────
 
 const catStyles: Record<string, { bg: string; label: string }> = {
-  PRIVATE_KEY:    { bg: "bg-red-600 text-white",         label: "PRIVATE KEY" },
-  CERTIFICATE:    { bg: "bg-red-500 text-white",         label: "CERTIFICATE" },
-  API_KEY:        { bg: "bg-orange-500 text-white",      label: "API KEY" },
-  CREDENTIAL:     { bg: "bg-orange-600 text-white",      label: "CREDENTIAL" },
-  SAFETY_BYPASS:  { bg: "bg-red-500 text-white",         label: "SAFETY BYPASS" },
-  FLASH_WRITE:    { bg: "bg-orange-500 text-white",      label: "FLASH WRITE" },
-  SHELL_COMMAND:  { bg: "bg-yellow-500 text-white",      label: "SHELL CMD" },
-  DEBUG_KEYWORD:  { bg: "bg-yellow-500 text-white",      label: "DEBUG" },
-  CRYPTO:         { bg: "bg-purple-500 text-white",      label: "CRYPTO" },
-  URL:            { bg: "bg-sky-500 text-white",         label: "URL" },
-  IP:             { bg: "bg-sky-500 text-white",         label: "IP" },
-  DOMAIN:         { bg: "bg-sky-500 text-white",         label: "DOMAIN" },
-  NETWORK_SERVICE:{ bg: "bg-sky-500 text-white",         label: "NETWORK" },
-  VERSION:        { bg: "bg-slate-400 text-white",       label: "VERSION" },
-  CRITICAL:       { bg: "bg-red-600 text-white",         label: "CRITICAL" },
-  HIGH:           { bg: "bg-orange-500 text-white",      label: "HIGH" },
-  MEDIUM:         { bg: "bg-yellow-500 text-white",      label: "MEDIUM" },
-  LOW:            { bg: "bg-green-500 text-white",       label: "LOW" },
+  PRIVATE_KEY:     { bg: "bg-red-500/15 text-red-300 border border-red-500/30",      label: "PRIVATE KEY" },
+  CERTIFICATE:     { bg: "bg-red-500/15 text-red-300 border border-red-500/30",      label: "CERTIFICATE" },
+  SAFETY_BYPASS:   { bg: "bg-red-500/15 text-red-300 border border-red-500/30",      label: "SAFETY BYPASS" },
+  API_KEY:         { bg: "bg-orange-500/15 text-orange-300 border border-orange-500/30", label: "API KEY" },
+  CREDENTIAL:      { bg: "bg-orange-500/15 text-orange-300 border border-orange-500/30", label: "CREDENTIAL" },
+  FLASH_WRITE:     { bg: "bg-orange-500/15 text-orange-300 border border-orange-500/30", label: "FLASH WRITE" },
+  SHELL_COMMAND:   { bg: "bg-amber-500/15 text-amber-300 border border-amber-500/30",  label: "SHELL CMD" },
+  DEBUG_KEYWORD:   { bg: "bg-amber-500/15 text-amber-300 border border-amber-500/30",  label: "DEBUG" },
+  CRYPTO:          { bg: "bg-amber-500/15 text-amber-300 border border-amber-500/30",  label: "CRYPTO" },
+  URL:             { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "URL" },
+  IP:              { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "IP" },
+  DOMAIN:          { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "DOMAIN" },
+  NETWORK_SERVICE: { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "NETWORK" },
+  VERSION:         { bg: "bg-slate-600/15 text-slate-500 border border-slate-600/30",  label: "VERSION" },
+  CRITICAL:        { bg: "bg-red-500/15 text-red-300 border border-red-500/30",        label: "CRITICAL" },
+  HIGH:            { bg: "bg-orange-500/15 text-orange-300 border border-orange-500/30", label: "HIGH" },
+  MEDIUM:          { bg: "bg-amber-500/15 text-amber-300 border border-amber-500/30",  label: "MEDIUM" },
+  LOW:             { bg: "bg-slate-500/15 text-slate-400 border border-slate-500/30",  label: "LOW" },
 };
 
 function CategoryBadge({ cat }: { cat: string }) {
   const style = catStyles[cat];
-  const cls   = style?.bg ?? "bg-slate-200 text-slate-600";
+  const cls   = style?.bg ?? "bg-slate-600/15 text-slate-400 border border-slate-600/30";
   const label = style?.label ?? cat;
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold tracking-wide ${cls}`}>
+    <span className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}>
       {label}
     </span>
   );

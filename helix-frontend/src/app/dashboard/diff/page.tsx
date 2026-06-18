@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { GitCompare } from "lucide-react";
 import {
   listScans, diffScans,
   type Scan, type ScanDiff, type ScanList,
@@ -25,30 +26,25 @@ function fmtDate(iso: string) {
 }
 
 function Delta({ value, unit = "", invert = false }: { value: number; unit?: string; invert?: boolean }) {
-  const bad = invert ? value < 0 : value > 0;
+  const bad  = invert ? value < 0 : value > 0;
   const good = invert ? value > 0 : value < 0;
-  const cls = value === 0 ? "text-slate-500" : bad ? "text-red-400" : good ? "text-emerald-400" : "text-slate-400";
-  const prefix = value > 0 ? "+" : "";
-  return <span className={`font-mono font-semibold ${cls}`}>{prefix}{value}{unit}</span>;
+  const cls  = value === 0 ? "text-slate-500" : bad ? "text-red-400" : good ? "text-emerald-400" : "text-slate-400";
+  return <span className={`font-mono font-semibold ${cls}`}>{value > 0 ? "+" : ""}{value}{unit}</span>;
 }
 
 function ScanSelector({
   label, value, onChange, scans, loading, exclude,
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  scans: Scan[];
-  loading: boolean;
-  exclude?: string;
+  label: string; value: string; onChange: (v: string) => void;
+  scans: Scan[]; loading: boolean; exclude?: string;
 }) {
   return (
     <div className="flex-1">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{label}</p>
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-1.5">{label}</p>
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full border border-slate-700 bg-slate-900/60 text-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full border border-[#1f2840] bg-[#0b0f1a] text-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition-colors"
         disabled={loading}
       >
         <option value="">— select scan —</option>
@@ -64,28 +60,28 @@ function ScanSelector({
   );
 }
 
-// ── Category badge (same palette as scan detail) ──────────────────────────────
-const catColors: Record<string, string> = {
-  SAFETY_BYPASS: "bg-red-500",
-  CREDENTIAL:    "bg-orange-600",
-  PRIVATE_KEY:   "bg-red-600",
-  API_KEY:       "bg-orange-500",
-  FLASH_WRITE:   "bg-orange-500",
-  SHELL_COMMAND: "bg-yellow-500",
-  DEBUG_KEYWORD: "bg-yellow-500",
-  CRYPTO:        "bg-purple-500",
-  URL:           "bg-sky-500",
-  IP:            "bg-sky-500",
-  DOMAIN:        "bg-sky-500",
-  VERSION:       "bg-slate-400",
+// ── Category + severity badges ─────────────────────────────────────────────────
+
+const catBg: Record<string, string> = {
+  SAFETY_BYPASS: "bg-red-500/15 text-red-300 border-red-500/30",
+  CREDENTIAL:    "bg-orange-500/15 text-orange-300 border-orange-500/30",
+  PRIVATE_KEY:   "bg-red-500/15 text-red-300 border-red-500/30",
+  API_KEY:       "bg-orange-500/15 text-orange-300 border-orange-500/30",
+  FLASH_WRITE:   "bg-orange-500/15 text-orange-300 border-orange-500/30",
+  SHELL_COMMAND: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  DEBUG_KEYWORD: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  CRYPTO:        "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  URL:           "bg-slate-500/15 text-slate-400 border-slate-500/30",
+  IP:            "bg-slate-500/15 text-slate-400 border-slate-500/30",
+  DOMAIN:        "bg-slate-500/15 text-slate-400 border-slate-500/30",
+  VERSION:       "bg-slate-600/15 text-slate-500 border-slate-600/30",
 };
 
 function CatBadge({ cat }: { cat: string }) {
-  const bg = catColors[cat] ?? "bg-slate-600";
-  const label = cat.replace(/_/g, " ");
+  const cls = catBg[cat] ?? "bg-slate-600/15 text-slate-400 border-slate-600/30";
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-white text-xs font-bold tracking-wide ${bg}`}>
-      {label}
+    <span className={`inline-block rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}>
+      {cat.replace(/_/g, " ")}
     </span>
   );
 }
@@ -93,14 +89,27 @@ function CatBadge({ cat }: { cat: string }) {
 function SevBadge({ sev }: { sev?: string }) {
   const s = (sev ?? "low").toLowerCase();
   const cls =
-    s === "critical" ? "bg-red-900/50 text-red-300 border-red-700/60" :
-    s === "high"     ? "bg-orange-900/50 text-orange-300 border-orange-700/60" :
-    s === "medium"   ? "bg-yellow-900/40 text-yellow-300 border-yellow-700/50" :
-                       "bg-slate-800 text-slate-400 border-slate-700";
+    s === "critical" ? "text-red-300 bg-red-500/10 border-red-500/30" :
+    s === "high"     ? "text-orange-300 bg-orange-500/10 border-orange-500/30" :
+    s === "medium"   ? "text-amber-300 bg-amber-500/10 border-amber-500/30" :
+                       "text-slate-400 bg-slate-500/10 border-slate-600/30";
   return (
-    <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold border ${cls}`}>
-      {s.toUpperCase()}
+    <span className={`inline-block rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${cls}`}>
+      {s}
     </span>
+  );
+}
+
+// ── Card shell ────────────────────────────────────────────────────────────────
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string; }) {
+  return (
+    <div
+      className={`rounded-xl border border-[#1f2840] shadow-card ${className}`}
+      style={{ background: "#121826" }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -112,15 +121,14 @@ export default function DiffPage() {
 
   const [scanIdA, setScanIdA] = useState(params.get("a") ?? "");
   const [scanIdB, setScanIdB] = useState(params.get("b") ?? "");
-  const [scans, setScans] = useState<Scan[]>([]);
+  const [scans, setScans]     = useState<Scan[]>([]);
   const [loadingScans, setLoadingScans] = useState(true);
-  const [diff, setDiff] = useState<ScanDiff | null>(null);
+  const [diff, setDiff]       = useState<ScanDiff | null>(null);
   const [comparing, setComparing] = useState(false);
-  const [error, setError] = useState("");
-  const [tab, setTab] = useState<"strings" | "yara">("strings");
-  const [strTab, setStrTab] = useState<"added" | "removed">("added");
+  const [error, setError]     = useState("");
+  const [tab, setTab]         = useState<"strings" | "yara">("strings");
+  const [strTab, setStrTab]   = useState<"added" | "removed">("added");
 
-  // Load completed scans for selectors
   useEffect(() => {
     (async () => {
       const pages: Scan[] = [];
@@ -138,7 +146,6 @@ export default function DiffPage() {
     })().catch(() => setLoadingScans(false));
   }, []);
 
-  // Auto-compare if both IDs in URL
   useEffect(() => {
     if (params.get("a") && params.get("b")) compare();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,9 +154,7 @@ export default function DiffPage() {
   const compare = useCallback(async () => {
     if (!scanIdA || !scanIdB) return;
     if (scanIdA === scanIdB) { setError("Select two different scans."); return; }
-    setError("");
-    setDiff(null);
-    setComparing(true);
+    setError(""); setDiff(null); setComparing(true);
     try {
       const result = await diffScans(scanIdA, scanIdB);
       setDiff(result);
@@ -165,146 +170,95 @@ export default function DiffPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-white">Firmware Compare</h1>
+        <h1 className="text-[15px] font-semibold text-slate-100">Firmware Compare</h1>
         <p className="text-slate-500 text-sm mt-0.5">
           Compare two completed scans — strings added/removed, new YARA matches, risk delta.
         </p>
       </div>
 
       {/* Selector card */}
-      <div className="rounded-xl border border-slate-700/60 p-5" style={{ background: "#161b27" }}>
+      <Card className="p-5">
         <div className="flex items-end gap-4 flex-wrap">
-          <ScanSelector
-            label="Baseline (A)"
-            value={scanIdA}
-            onChange={setScanIdA}
-            scans={scans}
-            loading={loadingScans}
-            exclude={scanIdB}
-          />
-          <div className="text-slate-600 text-xl font-bold pb-2 flex-shrink-0">vs</div>
-          <ScanSelector
-            label="Target (B)"
-            value={scanIdB}
-            onChange={setScanIdB}
-            scans={scans}
-            loading={loadingScans}
-            exclude={scanIdA}
-          />
+          <ScanSelector label="Baseline (A)" value={scanIdA} onChange={setScanIdA} scans={scans} loading={loadingScans} exclude={scanIdB} />
+          <div className="text-slate-600 text-lg font-bold pb-2.5 flex-shrink-0">vs</div>
+          <ScanSelector label="Target (B)" value={scanIdB} onChange={setScanIdB} scans={scans} loading={loadingScans} exclude={scanIdA} />
           <button
             onClick={compare}
             disabled={!scanIdA || !scanIdB || comparing || scanIdA === scanIdB}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors flex-shrink-0"
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors flex-shrink-0"
           >
-            {comparing ? <Spinner size={14} /> : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            )}
+            {comparing ? <Spinner size={14} /> : <GitCompare size={14} strokeWidth={2} />}
             {comparing ? "Comparing…" : "Compare →"}
           </button>
         </div>
         {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
-      </div>
+      </Card>
 
       {/* Results */}
       {diff && (
         <>
-          {/* Overview — two scan cards + delta row */}
+          {/* Overview — two scan metas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Scan A */}
-            <div className="rounded-xl border border-slate-700/60 p-4" style={{ background: "#161b27" }}>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Baseline A</p>
-                <RiskBadge level={diff.scan_a.risk_level ?? "informational"} score={diff.scan_a.risk_score} />
-              </div>
-              <Link href={`/dashboard/${diff.scan_a.id}`} className="font-semibold text-slate-200 hover:text-blue-400 transition-colors block truncate text-sm">
-                {diff.scan_a.filename}
-              </Link>
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                {[
-                  ["Risk",    `${diff.scan_a.risk_score ?? 0}/100`],
-                  ["Entropy", (diff.scan_a.entropy ?? 0).toFixed(2)],
-                  ["Strings", diff.scan_a.suspicious_count],
-                ].map(([k, v]) => (
-                  <div key={String(k)} className="text-center">
-                    <p className="text-xs text-slate-600">{k}</p>
-                    <p className="text-sm font-bold text-slate-300">{v}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Scan B */}
-            <div className="rounded-xl border border-slate-700/60 p-4" style={{ background: "#161b27" }}>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Target B</p>
-                <RiskBadge level={diff.scan_b.risk_level ?? "informational"} score={diff.scan_b.risk_score} />
-              </div>
-              <Link href={`/dashboard/${diff.scan_b.id}`} className="font-semibold text-slate-200 hover:text-blue-400 transition-colors block truncate text-sm">
-                {diff.scan_b.filename}
-              </Link>
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                {[
-                  ["Risk",    `${diff.scan_b.risk_score ?? 0}/100`],
-                  ["Entropy", (diff.scan_b.entropy ?? 0).toFixed(2)],
-                  ["Strings", diff.scan_b.suspicious_count],
-                ].map(([k, v]) => (
-                  <div key={String(k)} className="text-center">
-                    <p className="text-xs text-slate-600">{k}</p>
-                    <p className="text-sm font-bold text-slate-300">{v}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {([
+              { meta: diff.scan_a, scanLabel: "Baseline A" },
+              { meta: diff.scan_b, scanLabel: "Target B" },
+            ] as const).map(({ meta, scanLabel }) => (
+              <Card key={meta.id} className="p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.08em]">{scanLabel}</p>
+                  <RiskBadge level={meta.risk_level ?? "informational"} score={meta.risk_score} />
+                </div>
+                <Link href={`/dashboard/${meta.id}`} className="font-semibold text-slate-200 hover:text-brand-400 transition-colors block truncate text-[13px]">
+                  {meta.filename}
+                </Link>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {([
+                    ["Risk",    `${meta.risk_score ?? 0}/100`],
+                    ["Entropy", (meta.entropy ?? 0).toFixed(2)],
+                    ["Strings", meta.suspicious_count],
+                  ] as [string, string | number][]).map(([k, v]) => (
+                    <div key={k} className="text-center">
+                      <p className="text-[10px] text-slate-600 uppercase tracking-wide">{k}</p>
+                      <p className="text-[13px] font-bold text-slate-300 mt-0.5">{v}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
           </div>
 
           {/* Delta bar */}
-          <div className="rounded-xl border border-slate-700/60 px-6 py-4" style={{ background: "#161b27" }}>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Changes (B vs A)</p>
+          <Card className="px-6 py-4">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-3">Changes (B vs A)</p>
             <div className="flex flex-wrap gap-8">
-              <div className="text-center">
-                <p className="text-xs text-slate-600 mb-1">Risk Score</p>
-                <Delta value={diff.summary.risk_delta} />
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-600 mb-1">Entropy</p>
-                <Delta value={diff.summary.entropy_delta} />
-              </div>
-              {diff.summary.file_size_delta != null && (
-                <div className="text-center">
-                  <p className="text-xs text-slate-600 mb-1">File Size</p>
-                  <span className="font-mono font-semibold text-slate-400">
-                    {diff.summary.file_size_delta >= 0 ? "+" : ""}
-                    {fmtSize(diff.summary.file_size_delta)}
-                  </span>
+              {[
+                { label: "Risk Score",       node: <Delta value={diff.summary.risk_delta} /> },
+                { label: "Entropy",          node: <Delta value={diff.summary.entropy_delta} /> },
+                ...(diff.summary.file_size_delta != null ? [{
+                  label: "File Size",
+                  node: <span className="font-mono font-semibold text-slate-400">{diff.summary.file_size_delta >= 0 ? "+" : ""}{fmtSize(diff.summary.file_size_delta)}</span>,
+                }] : []),
+                { label: "New Strings",      node: <Delta value={diff.summary.strings_added} /> },
+                { label: "Removed Strings",  node: <Delta value={-diff.summary.strings_removed} invert /> },
+                { label: "New YARA",         node: <Delta value={diff.summary.yara_new} /> },
+                { label: "Resolved YARA",    node: <Delta value={-diff.summary.yara_resolved} invert /> },
+              ].map(({ label, node }) => (
+                <div key={label} className="text-center">
+                  <p className="text-[10px] text-slate-600 uppercase tracking-wide mb-1">{label}</p>
+                  {node}
                 </div>
-              )}
-              <div className="text-center">
-                <p className="text-xs text-slate-600 mb-1">New Strings</p>
-                <Delta value={diff.summary.strings_added} />
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-600 mb-1">Removed Strings</p>
-                <Delta value={-diff.summary.strings_removed} invert />
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-600 mb-1">New YARA</p>
-                <Delta value={diff.summary.yara_new} />
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-600 mb-1">Resolved YARA</p>
-                <Delta value={-diff.summary.yara_resolved} invert />
-              </div>
+              ))}
             </div>
-          </div>
+          </Card>
 
           {/* Findings tabs */}
-          <div className="rounded-xl overflow-hidden border border-slate-700/60" style={{ background: "#161b27" }}>
-            <div className="px-5 py-3 border-b border-slate-700/50">
-              <h2 className="font-semibold text-slate-300 text-sm tracking-tight">Detailed Changes</h2>
+          <Card>
+            <div className="px-5 py-3 border-b border-[#1f2840]">
+              <h2 className="font-semibold text-slate-300 text-[13px] tracking-tight">Detailed Changes</h2>
             </div>
             <div className="p-5">
               {/* Tab bar */}
-              <div className="flex gap-1 mb-5 border-b border-slate-700/50">
+              <div className="flex gap-1 mb-5 border-b border-[#1f2840]">
                 {(
                   [
                     ["strings", "Strings", diff.summary.strings_added + diff.summary.strings_removed],
@@ -315,12 +269,12 @@ export default function DiffPage() {
                     key={t}
                     onClick={() => setTab(t)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      tab === t ? "border-blue-500 text-blue-400" : "border-transparent text-slate-500 hover:text-slate-300"
+                      tab === t ? "border-brand-500 text-brand-400" : "border-transparent text-slate-500 hover:text-slate-300"
                     }`}
                   >
                     {label}
-                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                      tab === t ? "bg-blue-900/50 text-blue-400" : "bg-slate-800 text-slate-500"
+                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded font-semibold ${
+                      tab === t ? "bg-brand-500/20 text-brand-400" : "bg-slate-800 text-slate-500"
                     }`}>{count}</span>
                   </button>
                 ))}
@@ -329,44 +283,41 @@ export default function DiffPage() {
               {/* Strings tab */}
               {tab === "strings" && (
                 <div>
-                  {/* Sub-tabs: Added / Removed */}
                   <div className="flex gap-2 mb-4">
                     <button
                       onClick={() => setStrTab("added")}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
                         strTab === "added"
-                          ? "border-red-700/50 bg-red-900/20 text-red-300"
-                          : "border-slate-700/40 bg-slate-800/40 text-slate-500 hover:text-slate-300"
+                          ? "border-red-500/40 bg-red-500/8 text-red-300"
+                          : "border-[#1f2840] bg-[#121826] text-slate-500 hover:text-slate-300"
                       }`}
                     >
-                      <span className="text-base leading-none">+</span>
-                      {diff.summary.strings_added} Added (new risk)
+                      + {diff.summary.strings_added} Added
                     </button>
                     <button
                       onClick={() => setStrTab("removed")}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
                         strTab === "removed"
-                          ? "border-emerald-700/50 bg-emerald-900/20 text-emerald-300"
-                          : "border-slate-700/40 bg-slate-800/40 text-slate-500 hover:text-slate-300"
+                          ? "border-emerald-600/40 bg-emerald-500/8 text-emerald-300"
+                          : "border-[#1f2840] bg-[#121826] text-slate-500 hover:text-slate-300"
                       }`}
                     >
-                      <span className="text-base leading-none">−</span>
-                      {diff.summary.strings_removed} Removed (resolved)
+                      − {diff.summary.strings_removed} Removed
                     </button>
                   </div>
 
                   {strTab === "added" && (
                     diff.strings_added.length === 0 ? (
-                      <p className="text-sm text-slate-500 text-center py-8">No new strings — no new suspicious findings in B.</p>
+                      <p className="text-sm text-slate-500 text-center py-8">No new suspicious strings in B.</p>
                     ) : (
-                      <div className="rounded-lg border border-slate-700/40 overflow-hidden">
-                        <div className="max-h-[500px] overflow-y-auto divide-y divide-slate-700/30">
+                      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                        <div className="max-h-[500px] overflow-y-auto divide-y divide-[#1f2840]">
                           {diff.strings_added.map((s, i) => (
-                            <div key={i} className="flex items-center gap-3 px-3 py-2 bg-red-950/10 hover:bg-red-950/20 transition-colors">
+                            <div key={i} className="flex items-center gap-3 px-3 py-2 bg-red-500/4 hover:bg-red-500/8 transition-colors">
                               <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
                               <span className="w-32 flex-shrink-0"><CatBadge cat={s.category} /></span>
                               <span className="font-mono text-xs text-slate-300 break-all flex-1">{s.value?.slice(0, 120)}</span>
-                              <span className="text-xs text-slate-600 font-mono whitespace-nowrap">0x{(s.offset ?? 0).toString(16).padStart(6, "0")}</span>
+                              <span className="text-[11px] text-slate-600 font-mono whitespace-nowrap">0x{(s.offset ?? 0).toString(16).padStart(6, "0")}</span>
                             </div>
                           ))}
                         </div>
@@ -376,16 +327,16 @@ export default function DiffPage() {
 
                   {strTab === "removed" && (
                     diff.strings_removed.length === 0 ? (
-                      <p className="text-sm text-slate-500 text-center py-8">No strings removed — no findings resolved.</p>
+                      <p className="text-sm text-slate-500 text-center py-8">No strings removed between A and B.</p>
                     ) : (
-                      <div className="rounded-lg border border-slate-700/40 overflow-hidden">
-                        <div className="max-h-[500px] overflow-y-auto divide-y divide-slate-700/30">
+                      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                        <div className="max-h-[500px] overflow-y-auto divide-y divide-[#1f2840]">
                           {diff.strings_removed.map((s, i) => (
-                            <div key={i} className="flex items-center gap-3 px-3 py-2 bg-emerald-950/10 hover:bg-emerald-950/20 transition-colors">
+                            <div key={i} className="flex items-center gap-3 px-3 py-2 bg-emerald-500/4 hover:bg-emerald-500/8 transition-colors">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
                               <span className="w-32 flex-shrink-0"><CatBadge cat={s.category} /></span>
                               <span className="font-mono text-xs text-slate-300 break-all flex-1">{s.value?.slice(0, 120)}</span>
-                              <span className="text-xs text-slate-600 font-mono whitespace-nowrap">0x{(s.offset ?? 0).toString(16).padStart(6, "0")}</span>
+                              <span className="text-[11px] text-slate-600 font-mono whitespace-nowrap">0x{(s.offset ?? 0).toString(16).padStart(6, "0")}</span>
                             </div>
                           ))}
                         </div>
@@ -400,14 +351,14 @@ export default function DiffPage() {
                 <div className="space-y-4">
                   {diff.yara_new.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">
-                        + {diff.yara_new.length} New Rule Match{diff.yara_new.length !== 1 ? "es" : ""} (appeared in B)
+                      <p className="text-[10px] font-semibold text-red-400 uppercase tracking-[0.08em] mb-2">
+                        + {diff.yara_new.length} New Match{diff.yara_new.length !== 1 ? "es" : ""} (appeared in B)
                       </p>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {diff.yara_new.map((m, i) => (
-                          <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-red-800/30 bg-red-950/15">
+                          <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-red-500/20 bg-red-500/5">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
-                            <span className="font-semibold text-slate-200 text-sm flex-1">{m.rule}</span>
+                            <span className="font-medium text-slate-200 text-[13px] flex-1">{m.rule}</span>
                             <SevBadge sev={m.severity} />
                           </div>
                         ))}
@@ -416,14 +367,14 @@ export default function DiffPage() {
                   )}
                   {diff.yara_resolved.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-2">
-                        − {diff.yara_resolved.length} Resolved Rule{diff.yara_resolved.length !== 1 ? "s" : ""} (was in A, gone in B)
+                      <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-[0.08em] mb-2">
+                        − {diff.yara_resolved.length} Resolved (was in A, gone in B)
                       </p>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {diff.yara_resolved.map((m, i) => (
-                          <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-emerald-800/30 bg-emerald-950/15">
+                          <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-emerald-600/20 bg-emerald-500/5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                            <span className="font-semibold text-slate-200 text-sm flex-1">{m.rule}</span>
+                            <span className="font-medium text-slate-200 text-[13px] flex-1">{m.rule}</span>
                             <SevBadge sev={m.severity} />
                           </div>
                         ))}
@@ -436,7 +387,7 @@ export default function DiffPage() {
                 </div>
               )}
             </div>
-          </div>
+          </Card>
         </>
       )}
     </div>

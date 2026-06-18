@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
+      <div className="flex h-screen items-center justify-center" style={{ background: "#0b0f1a" }}>
         <Spinner size={32} />
       </div>
     );
@@ -62,11 +62,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pageTitle = PAGE_TITLES[pathname] ?? (pathname.startsWith("/dashboard/") ? "Scan Detail" : "");
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#0d1117" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: "#0b0f1a" }}>
       {/* Sidebar */}
-      <aside className="w-60 flex-shrink-0 flex flex-col border-r border-slate-800/60" style={{ background: "#0d1117" }}>
+      <aside className="w-60 flex-shrink-0 flex flex-col border-r border-[#1f2840]" style={{ background: "#0b0f1a" }}>
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-slate-800/60">
+        <div className="px-5 py-5 border-b border-[#1f2840]">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-900/50">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -95,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={`flex items-center gap-3 pl-5 pr-4 py-2.5 text-[13px] font-medium transition-all border-l-2 ${
                     active
                       ? "border-blue-500 bg-blue-500/10 text-white"
-                      : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+                      : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#121826]/80"
                   }`}
                 >
                   <span className={active ? "text-blue-400" : "text-slate-500"}>
@@ -122,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       className={`flex items-center gap-3 pl-5 pr-4 py-2.5 text-[13px] font-medium transition-all border-l-2 ${
                         active
                           ? "border-blue-500 bg-blue-500/10 text-white"
-                          : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+                          : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#121826]/80"
                       }`}
                     >
                       <span className={active ? "text-blue-400" : "text-slate-500"}>
@@ -138,7 +138,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* User card */}
-        <div className="border-t border-slate-800/60 px-4 py-3.5">
+        <div className="border-t border-[#1f2840] px-4 py-3.5">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {user.username[0].toUpperCase()}
@@ -165,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="border-b border-slate-800 px-8 py-3.5 flex items-center justify-between flex-shrink-0" style={{ background: "#0d1117" }}>
+        <header className="border-b border-[#1f2840] px-8 py-3.5 flex items-center justify-between flex-shrink-0" style={{ background: "#0b0f1a" }}>
           <h1 className="text-sm font-semibold text-slate-300">{pageTitle}</h1>
           <div className="flex items-center gap-2 text-xs text-slate-600">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -174,7 +174,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Content — full width with padding */}
-        <main className="flex-1 overflow-auto px-8 py-7" style={{ background: "#0f1520" }}>
+        <main className="flex-1 overflow-auto px-8 py-7" style={{ background: "#0b0f1a" }}>
           {children}
         </main>
       </div>
