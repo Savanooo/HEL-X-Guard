@@ -228,6 +228,7 @@ export default function ScanDetailPage() {
   const cveResult      = scan.cve           ?? {};
   const disasmResult   = scan.disasm        ?? {};
   const peripheralInfo = report?.peripherals ?? { available: false, peripherals: [], flags: [], flag_names: [] };
+  const cryptoKeysInfo = report?.crypto_keys ?? { available: false, keys: [], count: 0, has_private: false };
 
   const suspicious: { value: string; category: string; offset: number; encoding: string }[] =
     stringsInfo.suspicious ?? [];
@@ -587,30 +588,72 @@ export default function ScanDetailPage() {
 
             {/* Crypto tab */}
             {tab === "crypto" && (
-              <div className="space-y-3">
-                {cryptoInfo.count === 0 || !cryptoInfo.matches?.length ? (
-                  <p className="text-sm text-slate-500 text-center py-8">No cryptographic constants detected.</p>
-                ) : (
-                  <div className="rounded-lg border border-[#1f2840] overflow-hidden">
-                    <div className="grid grid-cols-[8rem_5rem_1fr] px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
-                      <span>Algorithm</span>
-                      <span>Confidence</span>
-                      <span>Offset</span>
+              <div className="space-y-4">
+                {/* Crypto constants */}
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">Algorithm Constants</p>
+                  {cryptoInfo.count === 0 || !cryptoInfo.matches?.length ? (
+                    <p className="text-sm text-slate-500 text-center py-4">No cryptographic constants detected.</p>
+                  ) : (
+                    <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                      <div className="grid grid-cols-[8rem_5rem_1fr] px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                        <span>Algorithm</span>
+                        <span>Confidence</span>
+                        <span>Offset</span>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto divide-y divide-[#1f2840]">
+                        {(cryptoInfo.matches as { algo: string; offset: number; confidence: string }[]).map((m, i) => (
+                          <div key={i} className="grid grid-cols-[8rem_5rem_1fr] px-3 py-2 hover:bg-[#161d2e] transition-colors text-xs">
+                            <span className="font-mono font-semibold text-blue-300">{m.algo}</span>
+                            <span className={`font-semibold ${
+                              m.confidence === "high"   ? "text-red-400" :
+                              m.confidence === "medium" ? "text-amber-400" : "text-slate-500"
+                            }`}>{m.confidence}</span>
+                            <span className="font-mono text-slate-500">0x{(typeof m.offset === "number" ? m.offset : 0).toString(16).padStart(6, "0")}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="max-h-96 overflow-y-auto divide-y divide-[#1f2840]">
-                      {(cryptoInfo.matches as { algo: string; offset: number; confidence: string }[]).map((m, i) => (
-                        <div key={i} className="grid grid-cols-[8rem_5rem_1fr] px-3 py-2 hover:bg-[#161d2e] transition-colors text-xs">
-                          <span className="font-mono font-semibold text-blue-300">{m.algo}</span>
-                          <span className={`font-semibold ${
-                            m.confidence === "high"   ? "text-red-400" :
-                            m.confidence === "medium" ? "text-amber-400" : "text-slate-500"
-                          }`}>{m.confidence}</span>
-                          <span className="font-mono text-slate-500">0x{m.offset.toString(16).padStart(6, "0")}</span>
-                        </div>
-                      ))}
+                  )}
+                </div>
+
+                {/* Key material */}
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
+                    Key Material
+                    {cryptoKeysInfo.has_private && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded bg-red-900/40 text-red-400 text-[9px] font-bold">PRIVATE KEY</span>
+                    )}
+                  </p>
+                  {!cryptoKeysInfo.available || !Array.isArray(cryptoKeysInfo.keys) || cryptoKeysInfo.keys.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-4">No key material candidates detected.</p>
+                  ) : (
+                    <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                      <div className="grid grid-cols-[6rem_5rem_4rem_1fr] px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                        <span>Type</span>
+                        <span>Offset</span>
+                        <span>Size</span>
+                        <span>Label</span>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto divide-y divide-[#1f2840]">
+                        {(cryptoKeysInfo.keys as { type: string; offset: number; size: number; entropy: number | null; label: string; context: string }[]).map((k, i) => (
+                          <div key={i} className="grid grid-cols-[6rem_5rem_4rem_1fr] px-3 py-2 hover:bg-[#161d2e] transition-colors text-xs">
+                            <span className={`font-semibold ${
+                              k.type === "pem_private_key"  ? "text-red-400" :
+                              k.type === "weak_key"         ? "text-orange-400" :
+                              k.type === "high_entropy_blob"? "text-yellow-400" :
+                              k.type === "iv_candidate"     ? "text-purple-400" :
+                                                              "text-slate-400"
+                            }`}>{k.type.replace(/_/g, " ")}</span>
+                            <span className="font-mono text-slate-400">0x{(typeof k.offset === "number" ? k.offset : 0).toString(16).padStart(5, "0")}</span>
+                            <span className="text-slate-400">{k.size}B</span>
+                            <span className="text-slate-300 truncate" title={k.label}>{k.label}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 

@@ -80,6 +80,7 @@ def _run_local(
         compliance,
         components,
         crypto_constants,
+        crypto_keys,
         elf_analysis,
         entropy,
         hashing,
@@ -107,14 +108,16 @@ def _run_local(
     checksec_r = checksec.analyze(firmware_path)
     crypto_r  = crypto_constants.analyze(firmware_path)
     comp_r    = components.analyze(firmware_path)
-    cert_r    = cert_extract.analyze(firmware_path)
-    periph_r  = peripheral_map.analyze(firmware_path, arch_r)
+    cert_r       = cert_extract.analyze(firmware_path)
+    periph_r     = peripheral_map.analyze(firmware_path, arch_r)
+    crypto_keys_r = crypto_keys.analyze(firmware_path)
 
     risk_r = risk_scoring.score(
         entropy_r, strings_r, yara_r, binwalk_r, elf_r,
         checksec_result=checksec_r,
         cert_result=cert_r,
         peripheral_result=periph_r,
+        crypto_keys_result=crypto_keys_r,
     )
 
     result = report.build(
@@ -126,6 +129,7 @@ def _run_local(
         components_result=comp_r,
         cert_result=cert_r,
         peripheral_result=periph_r,
+        crypto_keys_result=crypto_keys_r,
         firmware_info=firmware_info,
         display_name=display_name,
     )

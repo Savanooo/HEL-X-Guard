@@ -64,6 +64,13 @@ W_PERIPH_WDT_DISABLE = 10   # watchdog disable pattern detected
 W_PERIPH_RDP_BYPASS  = 15   # RDP readout-protection downgrade risk
 W_PERIPH_FLASH_WRITE =  8   # firmware can write its own flash
 
+# Crypto key material (crypto_keys.py — Feature 3)
+W_CK_PRIVATE_KEY     = 30   # embedded PEM private key
+W_CK_HIGH_ENT_BLOB   = 15   # high-entropy isolated blob ≥ 32 bytes
+CAP_CK_HIGH_ENT      = 30   # max contribution from high-entropy blobs
+W_CK_WEAK_KEY        = 20   # weak/test key (all-zero, sequential …)
+CAP_CK_WEAK          = 40   # max contribution from weak keys
+
 # YARA bootloader/SWD-enable — extra weight for critical MCU rules
 W_YARA_SWD_BOOTLOADER = 20  # applied on top of YARA_WEIGHTS for matching rules
 _SWD_BOOTLOADER_RULES = frozenset({
@@ -99,6 +106,7 @@ def score(
     cve_result: dict | None = None,
     cert_result: dict | None = None,
     peripheral_result: dict | None = None,
+    crypto_keys_result: dict | None = None,
 ) -> dict:
     """Compute a weighted risk score from all analysis module outputs.
 
@@ -289,6 +297,38 @@ def score(
             if expired:
                 msg += f" — {expired} expired"
             reasons.append(msg)
+
+    # ── Crypto key material (Feature 3) ──────────────────────────
+    if crypto_keys_result and crypto_keys_result.get("available"):
+        if crypto_keys_result.get("has_private"):
+            total += W_CK_PRIVATE_KEY
+            reasons.append("Crypto key extraction: PEM private key found embedded in firmware")
+
+        ck_high_ent_contrib = 0
+        ck_weak_contrib = 0
+        for key in crypto_keys_result.get("keys", []):
+            ktype = key.get("type", "")
+            ksize = key.get("size", 0)
+            if ktype == "high_entropy_blob" and ksize >= 32:
+                ck_high_ent_contrib += W_CK_HIGH_ENT_BLOB
+            elif ktype == "weak_key":
+                ck_weak_contrib += W_CK_WEAK_KEY
+
+        ck_high_ent_contrib = min(ck_high_ent_contrib, CAP_CK_HIGH_ENT)
+        ck_weak_contrib     = min(ck_weak_contrib,     CAP_CK_WEAK)
+
+        if ck_high_ent_contrib:
+            total += ck_high_ent_contrib
+            reasons.append(
+                f"Crypto key extraction: {ck_high_ent_contrib // W_CK_HIGH_ENT_BLOB} "
+                "high-entropy ≥256-bit blob(s) — possible hardcoded key material"
+            )
+        if ck_weak_contrib:
+            total += ck_weak_contrib
+            reasons.append(
+                f"Crypto key extraction: {ck_weak_contrib // W_CK_WEAK_KEY} "
+                "weak/test key(s) (all-zero, sequential, or known test vector)"
+            )
 
     # ── Peripheral flags (Feature 2) ─────────────────────────────
     if peripheral_result and peripheral_result.get("available"):
