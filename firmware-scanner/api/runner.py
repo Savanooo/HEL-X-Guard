@@ -23,11 +23,49 @@ _RULES_PATH = Path(__file__).resolve().parent.parent / "rules" / "firmware_rules
 
 # ── Local (non-Docker) scan ───────────────────────────────────────────────────
 
+def _build_combined_rules(db) -> tuple[Path | None, bool]:
+    """Return (rules_path, is_temp) for the combined YARA ruleset.
+
+    Merges the built-in firmware_rules.yar with all enabled user-managed rules
+    from the database.  Returns (built-in path, False) when no user rules are
+    enabled, or (temp file path, True) when user rules are present.
+    Caller is responsible for unlinking the temp file if is_temp is True.
+    """
+    from .models import YaraRule
+
+    user_rules = (
+        db.query(YaraRule)
+        .filter(YaraRule.enabled.is_(True))
+        .order_by(YaraRule.created_at)
+        .all()
+    )
+
+    builtin_exists = _RULES_PATH.exists()
+
+    if not user_rules:
+        return (_RULES_PATH if builtin_exists else None), False
+
+    # Write combined rules to a temp file
+    parts: list[str] = []
+    if builtin_exists:
+        parts.append(_RULES_PATH.read_text(encoding="utf-8"))
+    for rule in user_rules:
+        parts.append(f"\n// User rule: {rule.name}\n{rule.content}\n")
+
+    combined = "\n".join(parts)
+    fd, tmp = tempfile.mkstemp(suffix=".yar", prefix="helix_combined_")
+    import os as _os; _os.close(fd)
+    tmp_path = Path(tmp)
+    tmp_path.write_text(combined, encoding="utf-8")
+    return tmp_path, True
+
+
 def _run_local(
     firmware_path: Path,
     *,
     firmware_info: dict | None = None,
     display_name: str | None = None,
+    rules_path: Path | None = None,
 ) -> dict:
     """Run the scanner directly in the current process (no Docker).
 
@@ -50,7 +88,8 @@ def _run_local(
         yara_runner,
     )
 
-    rules_path = _RULES_PATH if _RULES_PATH.exists() else None
+    # rules_path: caller supplies combined (built-in + user) rules path; fall back to built-in
+    effective_rules = rules_path if rules_path is not None else (_RULES_PATH if _RULES_PATH.exists() else None)
 
     # Feed the known load address from HEX/SREC/UF2 records into arch_detect
     load_addr_override = (firmware_info or {}).get("load_address") or None
@@ -60,7 +99,7 @@ def _run_local(
     entropy_r = entropy.analyze(firmware_path)
     strings_r = strings_scan.scan(firmware_path)
     binwalk_r = binwalk_runner.scan(firmware_path)
-    yara_r    = yara_runner.scan(firmware_path, rules_path=rules_path) if rules_path else {"matches": [], "error": None}
+    yara_r    = yara_runner.scan(firmware_path, rules_path=effective_rules) if effective_rules else {"matches": [], "error": None}
     elf_r     = elf_analysis.analyze(firmware_path)
     arch_r    = arch_detect.analyze(firmware_path, load_address_override=load_addr_override)
     checksec_r = checksec.analyze(firmware_path)
@@ -142,21 +181,33 @@ def _run_scan(scan_id: str, stored_path: str) -> None:
                 firmware_info = None
                 display_name  = None
 
-            if settings.use_docker_sandbox:
-                try:
-                    result = _run_docker(analysis_path, output_dir)
-                except Exception:
+            # Build combined YARA rules (built-in + enabled user rules from DB)
+            combined_rules_path, combined_is_temp = _build_combined_rules(db)
+
+            try:
+                if settings.use_docker_sandbox:
+                    try:
+                        result = _run_docker(analysis_path, output_dir)
+                    except Exception:
+                        result = _run_local(
+                            analysis_path,
+                            firmware_info=firmware_info,
+                            display_name=display_name,
+                            rules_path=combined_rules_path,
+                        )
+                else:
                     result = _run_local(
                         analysis_path,
                         firmware_info=firmware_info,
                         display_name=display_name,
+                        rules_path=combined_rules_path,
                     )
-            else:
-                result = _run_local(
-                    analysis_path,
-                    firmware_info=firmware_info,
-                    display_name=display_name,
-                )
+            finally:
+                if combined_is_temp and combined_rules_path and combined_rules_path.exists():
+                    try:
+                        combined_rules_path.unlink()
+                    except OSError:
+                        pass
         finally:
             storage.cleanup_temp(local_path, is_temp)
             if norm_path and norm_path.exists():

@@ -104,3 +104,24 @@ class Scan(Base):
     )
 
     user: Mapped["User"] = relationship("User", back_populates="scans")
+
+
+class YaraRule(Base):
+    """User-managed YARA rules stored in the database.
+
+    Rules are validated at write time (must compile) and merged with the
+    built-in firmware_rules.yar at scan start.  Only enabled rules are used.
+    """
+    __tablename__ = "yara_rules"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    severity: Mapped[str] = mapped_column(String(16), default="medium")  # low|medium|high|critical
+    content: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

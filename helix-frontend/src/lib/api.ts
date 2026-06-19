@@ -220,6 +220,36 @@ export async function downloadReportPdf(id: string, suggestedName: string): Prom
   URL.revokeObjectURL(url);
 }
 
+// ── YARA rules ────────────────────────────────────────────────────────────────
+
+export interface YaraRule {
+  id: string;
+  name: string;
+  description: string;
+  severity: string;
+  content: string;
+  enabled: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const listYaraRules = () => req<YaraRule[]>("/api/v1/rules");
+export const getYaraRule   = (id: string) => req<YaraRule>(`/api/v1/rules/${id}`);
+export const validateYaraRule = (content: string) =>
+  req<{ ok: boolean; error: string | null }>("/api/v1/rules/validate", {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
+export const createYaraRule = (body: {
+  name: string; description?: string; severity?: string; content: string; enabled?: boolean;
+}) => req<YaraRule>("/api/v1/rules", { method: "POST", body: JSON.stringify(body) });
+export const updateYaraRule = (id: string, body: Partial<{
+  name: string; description: string; severity: string; content: string; enabled: boolean;
+}>) => req<YaraRule>(`/api/v1/rules/${id}`, { method: "PUT", body: JSON.stringify(body) });
+export const deleteYaraRule = (id: string) =>
+  req<void>(`/api/v1/rules/${id}`, { method: "DELETE" });
+
 // ── Diff ──────────────────────────────────────────────────────────────────────
 
 export interface DiffScanMeta {

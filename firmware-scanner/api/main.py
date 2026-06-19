@@ -15,6 +15,7 @@ from .database import SessionLocal
 from .models import User
 from .routers import audit as audit_router
 from .routers import auth as auth_router
+from .routers import rules as rules_router
 from .routers import scans as scans_router
 
 log = logging.getLogger(__name__)
@@ -83,6 +84,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(scans_router.router)
 app.include_router(audit_router.router)
+app.include_router(rules_router.router)
 
 
 @app.get("/health", tags=["meta"], summary="Health check")

@@ -117,6 +117,47 @@ class ScanDiffResponse(BaseModel):
     yara_resolved: list[dict[str, Any]]
 
 
+# ── YARA rules ────────────────────────────────────────────────────────────────
+
+class YaraRuleResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    severity: str
+    content: str
+    enabled: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class YaraRuleCreate(BaseModel):
+    name: str
+    description: str = ""
+    severity: str = "medium"  # low|medium|high|critical
+    content: str
+    enabled: bool = True
+
+
+class YaraRuleUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    severity: str | None = None
+    content: str | None = None
+    enabled: bool | None = None
+
+
+class YaraValidateRequest(BaseModel):
+    content: str
+
+
+class YaraValidateResponse(BaseModel):
+    ok: bool
+    error: str | None = None
+
+
 # ── Audit ─────────────────────────────────────────────────────────────────────
 
 class AuditLogResponse(BaseModel):
