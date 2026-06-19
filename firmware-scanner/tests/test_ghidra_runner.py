@@ -57,6 +57,7 @@ def fake_ghidra_home(monkeypatch, tmp_path):
 
 
 def test_decompile_timeout_returns_error(fake_ghidra_home, tmp_path):
+    (tmp_path / "fw.bin").write_bytes(b"\x7fELF" + b"\x00" * 28)
     with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="ghidra", timeout=1)):
         result = ghidra_runner.decompile(tmp_path / "fw.bin", tmp_path / "out", timeout=1)
     assert result["available"] is True
@@ -65,6 +66,7 @@ def test_decompile_timeout_returns_error(fake_ghidra_home, tmp_path):
 
 
 def test_decompile_nonzero_exit_returns_error(fake_ghidra_home, tmp_path):
+    (tmp_path / "fw.bin").write_bytes(b"\x7fELF" + b"\x00" * 28)
     with patch("subprocess.run", return_value=MagicMock(returncode=1, stderr="boom")):
         result = ghidra_runner.decompile(tmp_path / "fw.bin", tmp_path / "out")
     assert result["available"] is True
@@ -72,6 +74,7 @@ def test_decompile_nonzero_exit_returns_error(fake_ghidra_home, tmp_path):
 
 
 def test_decompile_missing_output_file_returns_error(fake_ghidra_home, tmp_path):
+    (tmp_path / "fw.bin").write_bytes(b"\x7fELF" + b"\x00" * 28)
     with patch("subprocess.run", return_value=MagicMock(returncode=0, stderr="")):
         result = ghidra_runner.decompile(tmp_path / "fw.bin", tmp_path / "out")
     assert result["available"] is True
@@ -79,6 +82,7 @@ def test_decompile_missing_output_file_returns_error(fake_ghidra_home, tmp_path)
 
 
 def test_decompile_success_parses_functions(fake_ghidra_home, tmp_path):
+    (tmp_path / "fw.bin").write_bytes(b"\x7fELF" + b"\x00" * 28)
     out_dir = tmp_path / "out"
     fake_functions = [{"name": "main", "address": "0x1000", "code": "int main() { return 0; }"}]
 
@@ -96,6 +100,7 @@ def test_decompile_success_parses_functions(fake_ghidra_home, tmp_path):
 
 
 def test_decompile_corrupt_output_returns_error(fake_ghidra_home, tmp_path):
+    (tmp_path / "fw.bin").write_bytes(b"\x7fELF" + b"\x00" * 28)
     out_dir = tmp_path / "out"
 
     def fake_run(cmd, **kwargs):

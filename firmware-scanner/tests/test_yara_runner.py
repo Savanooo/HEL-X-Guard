@@ -8,6 +8,19 @@ import pytest
 from firmware_scanner import yara_runner
 
 
+def _yara_available() -> bool:
+    try:
+        import yara  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+requires_yara = pytest.mark.skipif(
+    not _yara_available(), reason="yara-python not installed"
+)
+
+
 def test_missing_rules_file_returns_error(synthetic_firmware_file, tmp_path):
     result = yara_runner.scan(synthetic_firmware_file, rules_path=tmp_path / "nonexistent.yar")
     assert result["error"] is not None
@@ -27,7 +40,7 @@ def test_missing_yara_module_sets_error(synthetic_firmware_file, minimal_yara_ru
     assert result["matches"] == []
 
 
-@pytest.mark.requires_yara
+@requires_yara
 def test_matches_rsa_key(synthetic_firmware_file, minimal_yara_rules_file):
     result = yara_runner.scan(synthetic_firmware_file, rules_path=minimal_yara_rules_file)
     assert result["error"] is None
@@ -35,7 +48,7 @@ def test_matches_rsa_key(synthetic_firmware_file, minimal_yara_rules_file):
     assert "TestRSAKey" in rule_names
 
 
-@pytest.mark.requires_yara
+@requires_yara
 def test_matches_admin_credential(synthetic_firmware_file, minimal_yara_rules_file):
     result = yara_runner.scan(synthetic_firmware_file, rules_path=minimal_yara_rules_file)
     assert result["error"] is None
@@ -69,7 +82,7 @@ def test_match_has_required_fields(synthetic_firmware_file, minimal_yara_rules_f
         assert isinstance(match["strings"], list)
 
 
-@pytest.mark.requires_yara
+@requires_yara
 def test_rsa_match_severity_is_critical(synthetic_firmware_file, minimal_yara_rules_file):
     result = yara_runner.scan(synthetic_firmware_file, rules_path=minimal_yara_rules_file)
     rsa_matches = [m for m in result["matches"] if m["rule"] == "TestRSAKey"]

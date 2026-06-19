@@ -90,13 +90,18 @@ def test_no_duplicates_by_offset(synthetic_firmware_file):
 def test_chunk_boundary_no_duplicates(tmp_path):
     """A string spanning a 64-byte chunk boundary must appear exactly once.
 
-    Uses '!' padding: printable ASCII (0x21) but NOT a hex digit or base64 char,
-    so it cannot trigger API_KEY patterns that would shadow CREDENTIAL.
+    Padding cycles through 29 non-alnum, non-hex, non-base64 printable chars so
+    that (a) API_KEY patterns cannot fire and (b) _is_repetitive does not suppress
+    the match (uniform single-char padding would push the repetition ratio above
+    the 85 % threshold).
     """
     marker = b"password=hunter2secret"
     chunk = 64
-    # '!' = 0x21, printable, not in [0-9a-fA-F] or [A-Za-z0-9+/]
-    data = b"!" * (chunk - 5) + marker + b"!" * 100
+    # 29 printable chars: none in [0-9a-fA-F] (hex) or [A-Za-z0-9+/] (base64)
+    safe_chars = b'!"#$%&\'()*,-.;<>?@[\\]^_`{|}~'
+    pad_pre  = bytes([safe_chars[i % len(safe_chars)] for i in range(chunk - 5)])
+    pad_post = bytes([safe_chars[i % len(safe_chars)] for i in range(100)])
+    data = pad_pre + marker + pad_post
     fw = tmp_path / "boundary.bin"
     fw.write_bytes(data)
 
