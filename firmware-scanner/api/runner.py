@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,8 +23,17 @@ _RULES_PATH = Path(__file__).resolve().parent.parent / "rules" / "firmware_rules
 
 # ── Local (non-Docker) scan ───────────────────────────────────────────────────
 
-def _run_local(firmware_path: Path) -> dict:
-    """Run the scanner directly in the current process (no Docker)."""
+def _run_local(
+    firmware_path: Path,
+    *,
+    firmware_info: dict | None = None,
+    display_name: str | None = None,
+) -> dict:
+    """Run the scanner directly in the current process (no Docker).
+
+    *firmware_info* — optional metadata from firmware_loader (format, load address)
+    *display_name*  — original filename to store in the report for HEX/SREC/UF2 uploads
+    """
     from firmware_scanner import (
         arch_detect,
         binwalk_runner,
@@ -42,6 +52,9 @@ def _run_local(firmware_path: Path) -> dict:
 
     rules_path = _RULES_PATH if _RULES_PATH.exists() else None
 
+    # Feed the known load address from HEX/SREC/UF2 records into arch_detect
+    load_addr_override = (firmware_info or {}).get("load_address") or None
+
     # Tier 1 — always-on, fast
     hash_r    = hashing.hash_file(firmware_path)
     entropy_r = entropy.analyze(firmware_path)
@@ -49,7 +62,7 @@ def _run_local(firmware_path: Path) -> dict:
     binwalk_r = binwalk_runner.scan(firmware_path)
     yara_r    = yara_runner.scan(firmware_path, rules_path=rules_path) if rules_path else {"matches": [], "error": None}
     elf_r     = elf_analysis.analyze(firmware_path)
-    arch_r    = arch_detect.analyze(firmware_path)
+    arch_r    = arch_detect.analyze(firmware_path, load_address_override=load_addr_override)
     checksec_r = checksec.analyze(firmware_path)
     crypto_r  = crypto_constants.analyze(firmware_path)
     comp_r    = components.analyze(firmware_path)
@@ -69,6 +82,8 @@ def _run_local(firmware_path: Path) -> dict:
         crypto_result=crypto_r,
         components_result=comp_r,
         cert_result=cert_r,
+        firmware_info=firmware_info,
+        display_name=display_name,
     )
 
 
@@ -99,19 +114,56 @@ def _run_scan(scan_id: str, stored_path: str) -> None:
         db.commit()
 
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
+        norm_path: Path | None = None
         try:
             output_dir = storage.get_output_dir(scan_id)
 
+            # Normalize Intel HEX / SREC / UF2 → raw binary before analysis
+            from firmware_scanner import firmware_loader
+            try:
+                fw_info_obj = firmware_loader.load(local_path)
+            except Exception:
+                fw_info_obj = None
+
+            if fw_info_obj is not None and fw_info_obj.format_name != "raw":
+                # Write normalised bytes to a temp .bin file
+                fd, tmp = tempfile.mkstemp(suffix=".bin", prefix="helix_norm_")
+                import os; os.close(fd)
+                norm_path = Path(tmp)
+                norm_path.write_bytes(fw_info_obj.raw_bytes)
+                analysis_path  = norm_path
+                firmware_info  = {
+                    "original_format": fw_info_obj.format_name,
+                    "load_address":    fw_info_obj.load_address,
+                }
+                display_name = local_path.name  # e.g. "firmware.hex"
+            else:
+                analysis_path = local_path
+                firmware_info = None
+                display_name  = None
+
             if settings.use_docker_sandbox:
                 try:
-                    result = _run_docker(local_path, output_dir)
+                    result = _run_docker(analysis_path, output_dir)
                 except Exception:
-                    # Fall back to local scan if Docker fails
-                    result = _run_local(local_path)
+                    result = _run_local(
+                        analysis_path,
+                        firmware_info=firmware_info,
+                        display_name=display_name,
+                    )
             else:
-                result = _run_local(local_path)
+                result = _run_local(
+                    analysis_path,
+                    firmware_info=firmware_info,
+                    display_name=display_name,
+                )
         finally:
             storage.cleanup_temp(local_path, is_temp)
+            if norm_path and norm_path.exists():
+                try:
+                    norm_path.unlink()
+                except OSError:
+                    pass
 
         scan = db.get(Scan, scan_id)
         if scan is not None:

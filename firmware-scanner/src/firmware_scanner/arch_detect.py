@@ -44,8 +44,13 @@ def _infer_load_base(reset_addr: int, file_size: int) -> int | None:
     return None
 
 
-def analyze(path: Path) -> dict:
+def analyze(path: Path, *, load_address_override: int | None = None) -> dict:
     """Detect Cortex-M architecture by parsing the vector table.
+
+    *load_address_override* — when provided (non-zero) it is used as the flash
+    base instead of the heuristic list in *_FLASH_BASES*.  Pass the value
+    extracted from Intel HEX / SREC records so the caller's known base takes
+    precedence over inference.
 
     Returns a dict with keys: is_bare_metal, arch, endianness,
     inferred_load_address, initial_sp, reset_handler, sp_in_ram,
@@ -69,7 +74,12 @@ def analyze(path: Path) -> dict:
         thumb_mode  = bool(reset_handler_raw & 1)
         reset_addr  = reset_handler_raw & ~1
 
-        load_base   = _infer_load_base(reset_addr, len(data))
+        # Use the caller-supplied load address if given (e.g. from HEX records);
+        # otherwise infer from the known STM32/Cortex-M flash base list.
+        if load_address_override:
+            load_base = load_address_override
+        else:
+            load_base = _infer_load_base(reset_addr, len(data))
         is_bare_metal = load_base is not None
         sp_ok       = _sp_in_ram(initial_sp)
 

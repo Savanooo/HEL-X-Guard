@@ -48,14 +48,24 @@ def build(
     crypto_result: dict | None = None,
     components_result: dict | None = None,
     cert_result: dict | None = None,
+    firmware_info: dict | None = None,
+    display_name: str | None = None,
 ) -> dict:
-    """Assemble all analysis results into the canonical JSON report."""
+    """Assemble all analysis results into the canonical JSON report.
+
+    *firmware_info* — optional dict produced by firmware_loader for HEX/SREC/UF2
+    uploads; stored under ``report["firmware"]`` so callers can recover the
+    original format and flash base address.
+
+    *display_name* — original filename to show in the report when the analysis
+    runs on a normalised .bin rather than the uploaded file.
+    """
     size_bytes = path.stat().st_size
 
-    return {
+    report: dict = {
         "scan_id": str(uuid.uuid4()),
         "file": {
-            "name": path.name,
+            "name": display_name or path.name,
             "path": str(path.resolve()),
             "size": {
                 "bytes": size_bytes,
@@ -76,6 +86,18 @@ def build(
         "certs":       cert_result if cert_result is not None else {"certificates": [], "count": 0},
         "risk":        risk_result,
     }
+
+    if firmware_info and firmware_info.get("original_format", "raw") != "raw":
+        report["firmware"] = {
+            "original_format": firmware_info["original_format"],
+            "load_address": (
+                hex(firmware_info["load_address"])
+                if firmware_info.get("load_address")
+                else None
+            ),
+        }
+
+    return report
 
 
 def write(report: dict, output_path: Path) -> None:

@@ -1,6 +1,9 @@
 # Runtime
 click>=8.1.0
 
+# Firmware format normalisation (Intel HEX, Motorola S-Record, UF2 → raw binary)
+bincopy>=20.0.0
+
 # Optional: YARA pattern matching (scanner works without it, with a warning)
 # Install: pip install yara-python
 # Note: On Python 3.13+ may require compiling from source with YARA C library headers.
