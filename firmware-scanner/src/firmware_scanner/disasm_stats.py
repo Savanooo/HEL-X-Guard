@@ -155,15 +155,18 @@ def _is_prologue(mn: str, op_str: str, disasm_arch: str) -> bool:
 
 # ── Main analysis function ────────────────────────────────────────────────────
 
-def analyze(path: Path, arch_info: dict | None = None) -> dict:
+def analyze(path: Path, arch_info: dict | None = None,
+            data: bytes | None = None) -> dict:
     """Disassemble firmware and compute instruction statistics.
 
     Args:
-        path:      Path to firmware binary.
+        path:      Path to firmware binary (used only if *data* is None).
         arch_info: ``report_json["arch"]`` dict; used to extract
                    ``inferred_load_address``, ``capstone_arch``,
                    ``capstone_mode``, and ``disasm_arch``.
                    Falls back to ARM Thumb + 0x08000000 when absent.
+        data:      Pre-read firmware bytes.  When supplied the file is not
+                   re-read, avoiding an extra in-memory copy.
 
     Returns a dict with keys:
         available, mode, arch_name, load_address, code_bytes,
@@ -212,10 +215,11 @@ def analyze(path: Path, arch_info: dict | None = None) -> dict:
     load_addr_hex = hex(load_address)
 
     # ── read binary ───────────────────────────────────────────────────────────
-    try:
-        data = path.read_bytes()
-    except OSError as exc:
-        return {"available": False, "error": str(exc)}
+    if data is None:
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            return {"available": False, "error": str(exc)}
 
     code_bytes = len(data)
 

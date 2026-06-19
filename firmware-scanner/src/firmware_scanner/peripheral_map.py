@@ -1,8 +1,15 @@
 """Bare-metal Cortex-M peripheral / register-map analysis (Feature 2).
 
-Disassembles the firmware with capstone and collects every immediate
-operand that falls inside a known MCU peripheral address range.  Reports
-which peripheral blocks are "touched" and flags security-relevant accesses.
+Scans firmware bytes 4 at a time (word-scan) looking for 32-bit values
+that fall inside known MCU peripheral address ranges.  This is equivalent
+to extracting literal-pool constants from the binary, which is the
+dominant pattern for peripheral base-address loads in STM32 HAL code.
+
+Memory note: the word-scan replaces the earlier capstone full-disasm pass
+(which used detail=True and could consume >100 MB for a 2 MB binary).  The
+word-scan is O(n/4) integer comparisons and keeps only the matching values,
+so memory overhead is negligible.  MOVW/MOVT split-encoded immediates are
+not detected, but literal-pool loads cover the vast majority of cases.
 
 Peripheral map
 --------------
@@ -13,18 +20,10 @@ base is matched).  All addresses are labelled "approximate".
 
 Security flags raised
 ---------------------
-  flash_write_detected  — any access to the FLASH controller (write-to-
-                          flash without integrity checks is a supply-chain
-                          risk and may disable readout protection silently)
+  flash_write_detected  — any access to the FLASH controller
   debug_port_left_open  — access to DBGMCU / CoreDebug / DWT / ITM
-                          peripherals suggests the debug interface is
-                          enabled in production firmware
-  watchdog_disabled     — IWDG or WWDG KR/CR register addresses accessed
-                          in a pattern consistent with disabling the
-                          watchdog (write to key register before reload)
+  watchdog_disabled     — IWDG or WWDG KR/CR register addresses found
   rdp_bypass_risk       — FLASH_OPTCR / FLASH_OPTR / FLASH_CR accesses
-                          near Option Byte programming sequences — could
-                          indicate RDP downgrade or bypass
 
 Risk contributions (consumed by risk_scoring.score via the caller)
 -------------------------------------------------------------------
@@ -35,6 +34,7 @@ Risk contributions (consumed by risk_scoring.score via the caller)
 """
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 
 # ── Peripheral map ────────────────────────────────────────────────────────────
@@ -123,65 +123,34 @@ def _lookup_peripheral(addr: int) -> dict | None:
     return None
 
 
-# ── Disassemble and collect peripheral accesses ───────────────────────────────
+# ── Word-scan: find peripheral addresses in raw bytes ────────────────────────
 
-def _extract_immediates(data: bytes, load_address: int,
-                        cap_arch: int, cap_mode: int) -> list[int]:
-    """Return all 32-bit immediate values from the disassembly.
+def _word_scan_immediates(data: bytes) -> list[int]:
+    """Scan firmware bytes 4 at a time for 32-bit peripheral-range addresses.
 
-    Uses capstone with detail=True so we can inspect operand values.
-    Includes both mov-immediate patterns and literal pool loads (LDR pc-relative).
+    Covers literal-pool constants (the dominant pattern in STM32 HAL code).
+    O(n/4) time; output list is bounded by the number of matching 4-byte
+    windows — negligible memory versus a full capstone detail=True pass.
     """
-    try:
-        import capstone
-        md = capstone.Cs(cap_arch, cap_mode)
-        md.detail   = True
-        md.skipdata = True
-        immediates: list[int] = []
-
-        for insn in md.disasm(data, load_address):
-            if insn.mnemonic.startswith("."):
-                continue
-            # Extract 32-bit-range immediate operands
-            if hasattr(insn, "operands"):
-                for op in insn.operands:
-                    imm_val = None
-                    op_type = getattr(op, "type", None)
-                    # capstone ARM: OP_IMM=2, OP_MEM=3
-                    if op_type == 2:  # IMM
-                        imm_val = getattr(op, "imm", None)
-                    elif op_type == 3:  # MEM — check displacement
-                        mem = getattr(op, "mem", None)
-                        if mem:
-                            disp = getattr(mem, "disp", 0)
-                            # Only use memory operands where base looks like a peripheral addr
-                            base_reg_val = getattr(mem, "base", 0)
-                            if base_reg_val == 0 and disp and 0x40000000 <= disp <= 0xE00FFFFF:
-                                imm_val = disp
-                    if imm_val is not None:
-                        val = int(imm_val) & 0xFFFFFFFF
-                        if 0x40000000 <= val <= 0xE00FFFFF:
-                            immediates.append(val)
-            else:
-                # Fallback: parse hex values from op_str
-                import re
-                for m in re.finditer(r'0x([0-9a-fA-F]{5,8})', insn.op_str):
-                    val = int(m.group(1), 16)
-                    if 0x40000000 <= val <= 0xE00FFFFF:
-                        immediates.append(val)
-
-        return immediates
-    except Exception:
-        return []
+    immediates: list[int] = []
+    end = len(data) - 3
+    for i in range(0, end, 4):
+        val = struct.unpack_from("<I", data, i)[0]
+        if 0x40000000 <= val <= 0xE00FFFFF:
+            immediates.append(val)
+    return immediates
 
 
-def analyze(path: Path, arch_info: dict | None = None) -> dict:
-    """Disassemble firmware and map immediate values to MCU peripherals.
+def analyze(path: Path, arch_info: dict | None = None,
+            data: bytes | None = None) -> dict:
+    """Word-scan firmware bytes and map 32-bit values to MCU peripheral ranges.
 
     Args:
-        path:      Path to the firmware binary.
-        arch_info: ``report["arch"]`` from arch_detect.analyze().
-                   Used to obtain load_address, capstone_arch, capstone_mode.
+        path:      Path to the firmware binary (used only if *data* is None).
+        arch_info: ``report["arch"]`` from arch_detect.analyze() (kept for
+                   API compatibility; no longer needed for the word-scan path).
+        data:      Pre-read firmware bytes.  When supplied the file is not
+                   re-read, avoiding an extra in-memory copy.
 
     Returns:
         {
@@ -190,13 +159,13 @@ def analyze(path: Path, arch_info: dict | None = None) -> dict:
                              "category": str, "families": str}],
             "flags":       [{"flag": str, "severity": str, "description": str,
                              "risk_score": int}],
-            "flag_names":  [str],           # flat list for risk_scoring
+            "flag_names":  [str],
             "error":       str | None
         }
     Never raises.
     """
     try:
-        return _do_analyze(path, arch_info or {})
+        return _do_analyze(path, arch_info or {}, data)
     except Exception as exc:  # noqa: BLE001
         return {
             "available":   False,
@@ -207,43 +176,17 @@ def analyze(path: Path, arch_info: dict | None = None) -> dict:
         }
 
 
-def _do_analyze(path: Path, arch_info: dict) -> dict:
-    try:
-        import capstone  # noqa: F401
-    except ImportError:
-        return {
-            "available":   False,
-            "peripherals": [],
-            "flags":       [],
-            "flag_names":  [],
-            "error":       "capstone not installed",
-        }
+def _do_analyze(path: Path, arch_info: dict, data: bytes | None) -> dict:
+    if data is None:
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            return {
+                "available": False, "peripherals": [], "flags": [],
+                "flag_names": [], "error": str(exc),
+            }
 
-    # Resolve capstone arch / mode (default: ARM Thumb)
-    try:
-        import capstone as _cs
-        cap_arch = int(arch_info.get("capstone_arch") or _cs.CS_ARCH_ARM)
-        cap_mode = int(arch_info.get("capstone_mode") or _cs.CS_MODE_THUMB)
-    except (TypeError, ValueError):
-        import capstone as _cs
-        cap_arch = _cs.CS_ARCH_ARM
-        cap_mode = _cs.CS_MODE_THUMB
-
-    load_addr_raw = arch_info.get("inferred_load_address", "0x8000000")
-    try:
-        load_address = int(str(load_addr_raw), 16)
-    except (TypeError, ValueError):
-        load_address = 0x08000000
-
-    try:
-        data = path.read_bytes()
-    except OSError as exc:
-        return {
-            "available": False, "peripherals": [], "flags": [],
-            "flag_names": [], "error": str(exc),
-        }
-
-    immediates = _extract_immediates(data, load_address, cap_arch, cap_mode)
+    immediates = _word_scan_immediates(data)
 
     # Tally peripheral accesses
     access_counts: dict[str, dict] = {}

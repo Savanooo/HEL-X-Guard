@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import gc as _gc
 import json
 import tempfile
 import threading
@@ -19,6 +20,12 @@ from . import storage
 
 # Path to the bundled YARA rules — resolved relative to the project root
 _RULES_PATH = Path(__file__).resolve().parent.parent / "rules" / "firmware_rules.yar"
+
+# One heavy job at a time — prevents two concurrent scans from doubling RSS.
+_SCAN_SEM = threading.Semaphore(1)
+
+# Files larger than this skip the heaviest per-byte sweeps to avoid OOM.
+_HEAVY_SWEEP_LIMIT = 8 * 1024 * 1024   # 8 MB
 
 
 # ── Local (non-Docker) scan ───────────────────────────────────────────────────
@@ -97,20 +104,48 @@ def _run_local(
     # Feed the known load address from HEX/SREC/UF2 records into arch_detect
     load_addr_override = (firmware_info or {}).get("load_address") or None
 
-    # Tier 1 — always-on, fast
+    # ── Read firmware ONCE; share the buffer so modules don't each make a copy
+    try:
+        fw_data = firmware_path.read_bytes()
+    except OSError:
+        raise
+    over_limit = len(fw_data) > _HEAVY_SWEEP_LIMIT
+
+    # Tier 1 — always-on modules
+    # Streaming modules (hash / entropy / strings / yara) read from disk in
+    # chunks and don't hold the whole file in memory — keep passing path.
     hash_r    = hashing.hash_file(firmware_path)
     entropy_r = entropy.analyze(firmware_path)
     strings_r = strings_scan.scan(firmware_path)
     binwalk_r = binwalk_runner.scan(firmware_path)
     yara_r    = yara_runner.scan(firmware_path, rules_path=effective_rules) if effective_rules else {"matches": [], "error": None}
     elf_r     = elf_analysis.analyze(firmware_path)
-    arch_r    = arch_detect.analyze(firmware_path, load_address_override=load_addr_override)
+
+    # Pass shared buffer to avoid extra copies for the heaviest modules
+    arch_r     = arch_detect.analyze(firmware_path,
+                                     load_address_override=load_addr_override,
+                                     data=fw_data)
     checksec_r = checksec.analyze(firmware_path)
-    crypto_r  = crypto_constants.analyze(firmware_path)
-    comp_r    = components.analyze(firmware_path)
-    cert_r       = cert_extract.analyze(firmware_path)
-    periph_r     = peripheral_map.analyze(firmware_path, arch_r)
-    crypto_keys_r = crypto_keys.analyze(firmware_path)
+    crypto_r   = crypto_constants.analyze(firmware_path)
+    comp_r     = components.analyze(firmware_path)
+    cert_r     = cert_extract.analyze(firmware_path)
+
+    # Word-scan for peripheral addresses — uses shared buffer, no capstone pass
+    periph_r   = peripheral_map.analyze(firmware_path, arch_r, data=fw_data)
+
+    # crypto_keys does a full sliding-window scan: skip for very large files
+    if over_limit:
+        crypto_keys_r = {
+            "available": False, "keys": [], "count": 0,
+            "has_private": False,
+            "error": "skipped: large file",
+        }
+    else:
+        crypto_keys_r = crypto_keys.analyze(firmware_path)
+
+    # Release the shared buffer — all Tier-1 modules that needed it have run
+    del fw_data
+    _gc.collect()
 
     risk_r = risk_scoring.score(
         entropy_r, strings_r, yara_r, binwalk_r, elf_r,
@@ -196,23 +231,24 @@ def _run_scan(scan_id: str, stored_path: str) -> None:
             combined_rules_path, combined_is_temp = _build_combined_rules(db)
 
             try:
-                if settings.use_docker_sandbox:
-                    try:
-                        result = _run_docker(analysis_path, output_dir)
-                    except Exception:
+                with _SCAN_SEM:
+                    if settings.use_docker_sandbox:
+                        try:
+                            result = _run_docker(analysis_path, output_dir)
+                        except Exception:
+                            result = _run_local(
+                                analysis_path,
+                                firmware_info=firmware_info,
+                                display_name=display_name,
+                                rules_path=combined_rules_path,
+                            )
+                    else:
                         result = _run_local(
                             analysis_path,
                             firmware_info=firmware_info,
                             display_name=display_name,
                             rules_path=combined_rules_path,
                         )
-                else:
-                    result = _run_local(
-                        analysis_path,
-                        firmware_info=firmware_info,
-                        display_name=display_name,
-                        rules_path=combined_rules_path,
-                    )
             finally:
                 if combined_is_temp and combined_rules_path and combined_rules_path.exists():
                     try:
@@ -308,7 +344,8 @@ def _run_extraction(scan_id: str, stored_path: str) -> None:
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
             out_dir = storage.get_output_dir(scan_id) / "extracted"
-            result = binwalk_runner.extract(local_path, out_dir)
+            with _SCAN_SEM:
+                result = binwalk_runner.extract(local_path, out_dir)
         finally:
             storage.cleanup_temp(local_path, is_temp)
 
@@ -370,9 +407,10 @@ def _run_decompile(scan_id: str, stored_path: str,
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
             out_dir = storage.get_output_dir(scan_id) / "decompiled"
-            result = ghidra_runner.decompile(local_path, out_dir,
-                                             processor=processor,
-                                             base_address=base_address)
+            with _SCAN_SEM:
+                result = ghidra_runner.decompile(local_path, out_dir,
+                                                 processor=processor,
+                                                 base_address=base_address)
         finally:
             storage.cleanup_temp(local_path, is_temp)
 
@@ -497,7 +535,8 @@ def _run_disasm(scan_id: str, stored_path: str, arch: str = "thumb") -> None:
 
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
-            result = disasm_stats.analyze(local_path, arch_info=arch_info)
+            with _SCAN_SEM:
+                result = disasm_stats.analyze(local_path, arch_info=arch_info)
         finally:
             storage.cleanup_temp(local_path, is_temp)
 

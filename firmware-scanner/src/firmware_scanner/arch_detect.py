@@ -125,15 +125,21 @@ def probe_arch(data: bytes, sample_size: int = _PROBE_SAMPLE) -> tuple[str, int 
 
 # ── Primary analysis ──────────────────────────────────────────────────────────
 
-def analyze(path: Path, *, load_address_override: int | None = None) -> dict:
+_PROBE_MAX = 65536   # cap multi-arch probe at first 64 KB
+
+
+def analyze(path: Path, *, load_address_override: int | None = None,
+            data: bytes | None = None) -> dict:
     """Detect architecture by parsing the ARM Cortex-M vector table.
 
     Falls back to probing all supported capstone arches when the binary
     does not look like bare-metal Cortex-M firmware.
 
     *load_address_override* — when provided (non-zero) it is used as the
-    flash base instead of the heuristic list in *_FLASH_BASES*.  Pass the
-    value extracted from Intel HEX / SREC records.
+    flash base instead of the heuristic list in *_FLASH_BASES*.
+
+    *data* — pre-read firmware bytes.  When supplied the file is not
+    re-read, avoiding an extra in-memory copy.
 
     Returns a dict with keys:
         is_bare_metal, arch, endianness, inferred_load_address,
@@ -141,13 +147,14 @@ def analyze(path: Path, *, load_address_override: int | None = None) -> dict:
         vector_table (list), reset_disasm (list), error,
         disasm_arch (str), capstone_arch (int|None), capstone_mode (int|None)
     """
-    try:
-        data = path.read_bytes()
-    except OSError as exc:
-        return {
-            "is_bare_metal": False, "arch": "unknown", "error": str(exc),
-            "disasm_arch": "unknown", "capstone_arch": None, "capstone_mode": None,
-        }
+    if data is None:
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            return {
+                "is_bare_metal": False, "arch": "unknown", "error": str(exc),
+                "disasm_arch": "unknown", "capstone_arch": None, "capstone_mode": None,
+            }
 
     if len(data) < 8:
         return {
@@ -195,7 +202,9 @@ def analyze(path: Path, *, load_address_override: int | None = None) -> dict:
             # Cortex-M detected — always Thumb-2 for Cortex-M0/M0+/M3/M4/M7/M33/M55
             disasm_arch, cap_arch, cap_mode = _cortex_m_cs(thumb_mode)
         else:
-            disasm_arch, cap_arch, cap_mode = probe_arch(data)
+            # Limit probe to first 64 KB — avoids iterating capstone over the
+            # entire binary × N arch candidates (memory and CPU savings).
+            disasm_arch, cap_arch, cap_mode = probe_arch(data[:_PROBE_MAX])
 
         return {
             "is_bare_metal":         is_bare_metal,

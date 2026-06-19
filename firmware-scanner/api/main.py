@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -56,9 +57,54 @@ def _bootstrap_db() -> None:
         db.close()
 
 
+def _recover_orphans() -> None:
+    """Mark scans left in 'running' state by a previous crash as 'failed'.
+
+    Called once at startup before the API starts accepting requests.  Any
+    scan (or sub-task) whose status is still 'running' was interrupted by a
+    server restart or OOM-kill — it will never complete on its own, so we
+    flip it to 'failed' so the UI doesn't show it as spinning forever.
+    """
+    from .models import Scan
+
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        msg = "interrupted (server restart/OOM)"
+
+        for scan in db.query(Scan).filter(Scan.status == "running").all():
+            scan.status        = "failed"
+            scan.error_message = msg
+            scan.completed_at  = now
+
+        for scan in db.query(Scan).filter(Scan.extraction_status == "running").all():
+            scan.extraction_status = "failed"
+            scan.extraction_error  = msg
+
+        for scan in db.query(Scan).filter(Scan.decompile_status == "running").all():
+            scan.decompile_status = "failed"
+            scan.decompile_error  = msg
+
+        for scan in db.query(Scan).filter(Scan.cve_status == "running").all():
+            scan.cve_status = "failed"
+            scan.cve_error  = msg
+
+        for scan in db.query(Scan).filter(Scan.disasm_status == "running").all():
+            scan.disasm_status = "failed"
+            scan.disasm_error  = msg
+
+        db.commit()
+        log.info("Startup: orphan recovery complete")
+    except Exception:
+        log.exception("Startup: orphan recovery failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _bootstrap_db()
+    _recover_orphans()
     yield
 
 
