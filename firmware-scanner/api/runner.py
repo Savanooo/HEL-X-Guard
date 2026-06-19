@@ -77,6 +77,7 @@ def _run_local(
         binwalk_runner,
         cert_extract,
         checksec,
+        compliance,
         components,
         crypto_constants,
         elf_analysis,
@@ -113,7 +114,7 @@ def _run_local(
         cert_result=cert_r,
     )
 
-    return report.build(
+    result = report.build(
         firmware_path, hash_r, entropy_r, strings_r, binwalk_r, yara_r, risk_r,
         elf_result=elf_r,
         arch_result=arch_r,
@@ -124,6 +125,8 @@ def _run_local(
         firmware_info=firmware_info,
         display_name=display_name,
     )
+    result["compliance"] = compliance.analyze(result)
+    return result
 
 
 # ── Docker scan ───────────────────────────────────────────────────────────────

@@ -1,0 +1,351 @@
+{
+  "yara_rules": {
+    "EmbeddedRSAPrivateKey": {
+      "title": "Embedded private key in firmware",
+      "cwe": ["CWE-321", "CWE-312"],
+      "eu_cra": ["Annex I §1(4)", "Annex I §1(2)"],
+      "iec_62443": ["SR 4.1", "SR 4.3"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.C.2"]
+    },
+    "EmbeddedSSHAuthorizedKey": {
+      "title": "SSH authorized key embedded in firmware",
+      "cwe": ["CWE-321", "CWE-798"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(4)"],
+      "iec_62443": ["SR 1.5", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.C.1"]
+    },
+    "HardcodedDefaultCredentials": {
+      "title": "Default credentials hardcoded in firmware",
+      "cwe": ["CWE-798", "CWE-259"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(2)"],
+      "iec_62443": ["SR 1.1", "SR 1.5"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.C.1"]
+    },
+    "AWSAccessKey": {
+      "title": "AWS access key embedded in firmware",
+      "cwe": ["CWE-798", "CWE-321"],
+      "eu_cra": ["Annex I §1(4)", "Annex I §1(3)"],
+      "iec_62443": ["SR 1.5", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "MiraiBotnet": {
+      "title": "Mirai botnet indicators in firmware",
+      "cwe": ["CWE-506", "CWE-912"],
+      "eu_cra": ["Annex I §1(1)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "SuspiciousDownloadChain": {
+      "title": "Suspicious download or dropper chain",
+      "cwe": ["CWE-494", "CWE-78"],
+      "eu_cra": ["Annex I §1(5)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "CryptoMiner": {
+      "title": "Cryptocurrency mining code in firmware",
+      "cwe": ["CWE-506"],
+      "eu_cra": ["Annex I §1(1)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "WeakCryptographyIdentifiers": {
+      "title": "Weak or deprecated cryptographic algorithms",
+      "cwe": ["CWE-327", "CWE-326"],
+      "eu_cra": ["Annex I §1(4)", "Annex I §1(2)"],
+      "iec_62443": ["SR 4.3"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.C.3"]
+    },
+    "DebugBackdoorKeywords": {
+      "title": "Debug or backdoor keywords in firmware",
+      "cwe": ["CWE-912", "CWE-1244"],
+      "eu_cra": ["Annex I §1(6)", "Annex I §1(2)"],
+      "iec_62443": ["SR 1.3", "SR 3.3"],
+      "fda": ["§ 524B(b)(1)", "§ 524B(b)(3)"]
+    },
+    "SerialConsoleInterface": {
+      "title": "Serial/UART debug console in production firmware",
+      "cwe": ["CWE-912", "CWE-1244"],
+      "eu_cra": ["Annex I §1(6)", "Annex I §1(2)"],
+      "iec_62443": ["SR 1.3", "SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "STM32NoReadProtection": {
+      "title": "STM32 read-out protection disabled",
+      "cwe": ["CWE-1244", "CWE-1259"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(5)"],
+      "iec_62443": ["SR 3.3", "SR 7.6"],
+      "fda": ["§ 524B(b)(1)", "§ 524B(b)(3)"]
+    },
+    "MPUDisabledFlag": {
+      "title": "ARM Cortex-M MPU explicitly disabled",
+      "cwe": ["CWE-1220", "CWE-693"],
+      "eu_cra": ["Annex I §1(5)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "SafetyBypassFlags": {
+      "title": "Safety-bypass or test-mode flags in production",
+      "cwe": ["CWE-912", "CWE-1188"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3", "SR 7.6"],
+      "fda": ["§ 524B(b)(1)", "§ 524B(b)(3)", "FDA 2023 §V.B"]
+    },
+    "HiddenServiceMenu": {
+      "title": "Hidden engineering/service menu in firmware",
+      "cwe": ["CWE-912"],
+      "eu_cra": ["Annex I §1(6)"],
+      "iec_62443": ["SR 1.3", "SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "UnsignedFirmwareUpdateBypass": {
+      "title": "Unsigned firmware update bypass in firmware",
+      "cwe": ["CWE-494", "CWE-345"],
+      "eu_cra": ["Annex I §1(5)", "Annex I §1(9)"],
+      "iec_62443": ["SR 3.3", "SR 7.6"],
+      "fda": ["§ 524B(b)(2)", "FDA 2023 §V.C.5"]
+    },
+    "SWDJTAGEnable": {
+      "title": "SWD/JTAG debug port enabled in production",
+      "cwe": ["CWE-1244"],
+      "eu_cra": ["Annex I §1(6)", "Annex I §1(3)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "BootloaderUnlock": {
+      "title": "Bootloader unlock or DFU mode entry present",
+      "cwe": ["CWE-1197", "CWE-494"],
+      "eu_cra": ["Annex I §1(5)", "Annex I §1(3)"],
+      "iec_62443": ["SR 3.3", "SR 7.6"],
+      "fda": ["§ 524B(b)(2)", "§ 524B(b)(3)"]
+    },
+    "HardcodedWiFiCredentials": {
+      "title": "Hardcoded WiFi credentials in firmware",
+      "cwe": ["CWE-798", "CWE-259"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(4)"],
+      "iec_62443": ["SR 1.5", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "HardcodedMQTTCredentials": {
+      "title": "MQTT broker credentials embedded in firmware",
+      "cwe": ["CWE-798", "CWE-321"],
+      "eu_cra": ["Annex I §1(4)", "Annex I §1(3)"],
+      "iec_62443": ["SR 1.5", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "ATCommandBackdoor": {
+      "title": "Hidden AT command backdoor interface",
+      "cwe": ["CWE-912"],
+      "eu_cra": ["Annex I §1(6)"],
+      "iec_62443": ["SR 1.3", "SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "MedicalDeviceSensitiveStrings": {
+      "title": "Medical device sensitive data identifiers",
+      "cwe": ["CWE-312", "CWE-359"],
+      "eu_cra": ["Annex I §1(4)"],
+      "iec_62443": ["SR 4.1"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.D"]
+    },
+    "SemihostingDebugTraps": {
+      "title": "ARM semihosting debug traps in production",
+      "cwe": ["CWE-1244"],
+      "eu_cra": ["Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "EmbeddedELFDropper": {
+      "title": "ELF binary dropper embedded in firmware",
+      "cwe": ["CWE-506", "CWE-494"],
+      "eu_cra": ["Annex I §1(1)", "Annex I §1(5)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "OTAFirmwareUpdateURL": {
+      "title": "OTA firmware update URL (verify TLS and signature)",
+      "cwe": ["CWE-494", "CWE-295"],
+      "eu_cra": ["Annex I §1(9)", "Annex I §1(5)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(2)"]
+    },
+    "STM32FlashUnlockSequence": {
+      "title": "STM32 flash unlock sequence in firmware",
+      "cwe": ["CWE-1197"],
+      "eu_cra": ["Annex I §1(5)"],
+      "iec_62443": ["SR 7.6"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "UPXPackedBinary": {
+      "title": "UPX-packed binary may conceal malicious code",
+      "cwe": ["CWE-506"],
+      "eu_cra": ["Annex I §1(1)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "TelnetBackdoor": {
+      "title": "Telnet service enabled — insecure remote access",
+      "cwe": ["CWE-319", "CWE-311"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(6)"],
+      "iec_62443": ["SR 1.3", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "BusyBoxEmbedded": {
+      "title": "BusyBox Linux environment embedded in firmware",
+      "cwe": ["CWE-1125"],
+      "eu_cra": ["Annex I §1(1)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": []
+    },
+    "FreeRTOSDetected": {
+      "title": "FreeRTOS detected — verify stack overflow protection",
+      "cwe": ["CWE-121"],
+      "eu_cra": ["Annex I §1(5)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": []
+    },
+    "DebugLogFormatStrings": {
+      "title": "Debug log format strings present in production build",
+      "cwe": ["CWE-215"],
+      "eu_cra": ["Annex I §1(8)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": []
+    },
+    "HardcodedNetworkConfig": {
+      "title": "Hardcoded network configuration in firmware",
+      "cwe": ["CWE-1188"],
+      "eu_cra": ["Annex I §1(2)", "Annex I §1(6)"],
+      "iec_62443": ["SR 7.6"],
+      "fda": []
+    }
+  },
+  "string_categories": {
+    "PRIVATE_KEY": {
+      "title": "Embedded private key or certificate",
+      "cwe": ["CWE-321", "CWE-312"],
+      "eu_cra": ["Annex I §1(4)", "Annex I §1(2)"],
+      "iec_62443": ["SR 4.1", "SR 4.3"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.C.2"]
+    },
+    "CERTIFICATE": {
+      "title": "X.509 certificate embedded in firmware",
+      "cwe": ["CWE-295"],
+      "eu_cra": ["Annex I §1(4)"],
+      "iec_62443": ["SR 4.3"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "CREDENTIAL": {
+      "title": "Hardcoded credentials",
+      "cwe": ["CWE-798", "CWE-259"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(2)"],
+      "iec_62443": ["SR 1.1", "SR 1.5"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.C.1"]
+    },
+    "API_KEY": {
+      "title": "API keys or access tokens embedded in firmware",
+      "cwe": ["CWE-798", "CWE-321"],
+      "eu_cra": ["Annex I §1(4)", "Annex I §1(3)"],
+      "iec_62443": ["SR 1.5", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "DEBUG_KEYWORD": {
+      "title": "Debug or backdoor keywords in production firmware",
+      "cwe": ["CWE-912", "CWE-1244"],
+      "eu_cra": ["Annex I §1(6)", "Annex I §1(2)"],
+      "iec_62443": ["SR 1.3", "SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "SHELL_COMMAND": {
+      "title": "Shell command strings embedded in firmware",
+      "cwe": ["CWE-78", "CWE-77"],
+      "eu_cra": ["Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "SAFETY_BYPASS": {
+      "title": "Safety-bypass flags in production firmware",
+      "cwe": ["CWE-912", "CWE-1188"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)", "FDA 2023 §V.B"]
+    },
+    "CRYPTO": {
+      "title": "Weak or deprecated cryptographic identifiers",
+      "cwe": ["CWE-327", "CWE-326"],
+      "eu_cra": ["Annex I §1(4)"],
+      "iec_62443": ["SR 4.3"],
+      "fda": ["§ 524B(b)(3)", "FDA 2023 §V.C.3"]
+    },
+    "WIFI_CREDENTIAL": {
+      "title": "Hardcoded WiFi credentials in firmware",
+      "cwe": ["CWE-798", "CWE-259"],
+      "eu_cra": ["Annex I §1(3)", "Annex I §1(4)"],
+      "iec_62443": ["SR 1.5", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "MQTT_BROKER": {
+      "title": "Hardcoded MQTT broker credentials",
+      "cwe": ["CWE-798", "CWE-321"],
+      "eu_cra": ["Annex I §1(4)", "Annex I §1(3)"],
+      "iec_62443": ["SR 1.5", "SR 4.1"],
+      "fda": ["§ 524B(b)(3)"]
+    },
+    "FLASH_WRITE": {
+      "title": "Flash write or erase capability strings",
+      "cwe": ["CWE-1197"],
+      "eu_cra": ["Annex I §1(5)"],
+      "iec_62443": ["SR 7.6"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "BOOTLOADER": {
+      "title": "Bootloader bypass or DFU mode keywords",
+      "cwe": ["CWE-1197", "CWE-494"],
+      "eu_cra": ["Annex I §1(5)", "Annex I §1(3)"],
+      "iec_62443": ["SR 3.3", "SR 7.6"],
+      "fda": ["§ 524B(b)(2)"]
+    }
+  },
+  "conditions": {
+    "no_nx": {
+      "title": "NX (no-execute) memory protection disabled",
+      "cwe": ["CWE-693", "CWE-119"],
+      "eu_cra": ["Annex I §1(5)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "no_pie": {
+      "title": "Position-independent executable (PIE/ASLR) not enabled",
+      "cwe": ["CWE-693"],
+      "eu_cra": ["Annex I §1(5)", "Annex I §1(6)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "no_stack_canary": {
+      "title": "Stack canary (buffer overflow protection) not linked",
+      "cwe": ["CWE-121", "CWE-693"],
+      "eu_cra": ["Annex I §1(5)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "no_relro": {
+      "title": "No RELRO (GOT/PLT write-protection) present",
+      "cwe": ["CWE-693"],
+      "eu_cra": ["Annex I §1(5)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": ["§ 524B(b)(1)"]
+    },
+    "partial_relro": {
+      "title": "Partial RELRO only — full RELRO recommended",
+      "cwe": ["CWE-693"],
+      "eu_cra": ["Annex I §1(5)"],
+      "iec_62443": ["SR 3.3"],
+      "fda": []
+    },
+    "high_entropy": {
+      "title": "High overall entropy — possible encryption or obfuscation",
+      "cwe": ["CWE-261"],
+      "eu_cra": ["Annex I §1(4)"],
+      "iec_62443": ["SR 4.1"],
+      "fda": []
+    }
+  }
+}

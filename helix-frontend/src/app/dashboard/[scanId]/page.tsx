@@ -83,7 +83,7 @@ export default function ScanDetailPage() {
   const router = useRouter();
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree" | "arch" | "sbom" | "crypto">("strings");
+  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree" | "arch" | "sbom" | "crypto" | "compliance">("strings");
   const [extractError, setExtractError] = useState("");
   const [decompileError, setDecompileError] = useState("");
   const [triggeringExtract, setTriggeringExtract] = useState(false);
@@ -219,13 +219,14 @@ export default function ScanDetailPage() {
   const riskInfo   = report?.risk    ?? {};
   const stringsInfo = report?.strings ?? {};
   const yaraInfo   = report?.yara    ?? {};
-  const binwalkInfo  = report?.binwalk     ?? {};
-  const archInfo     = report?.arch        ?? {};
-  const checksecInfo = report?.checksec    ?? {};
-  const cryptoInfo   = report?.crypto      ?? {};
-  const compInfo     = report?.components  ?? {};
-  const cveResult    = scan.cve            ?? {};
-  const disasmResult = scan.disasm         ?? {};
+  const binwalkInfo    = report?.binwalk    ?? {};
+  const archInfo       = report?.arch       ?? {};
+  const checksecInfo   = report?.checksec   ?? {};
+  const cryptoInfo     = report?.crypto     ?? {};
+  const compInfo       = report?.components ?? {};
+  const complianceData = report?.compliance ?? { mappings: [], summary: { cwe: [], eu_cra: [], iec_62443: [], fda: [] } };
+  const cveResult      = scan.cve           ?? {};
+  const disasmResult   = scan.disasm        ?? {};
 
   const suspicious: { value: string; category: string; offset: number; encoding: string }[] =
     stringsInfo.suspicious ?? [];
@@ -377,13 +378,14 @@ export default function ScanDetailPage() {
             <div className="flex flex-wrap gap-1 mb-5 border-b border-[#1f2840] pb-0">
               {(
                 [
-                  ["strings", "Strings",      suspicious.length],
-                  ["yara",    "YARA",          yaraMatches.length],
-                  ["binwalk", "Binwalk",        binwalkFindings.length],
-                  ["arch",    "Arch",           archInfo.is_bare_metal ? 1 : null],
-                  ["sbom",    "SBOM",           compInfo.count ?? null],
-                  ["crypto",  "Crypto",         cryptoInfo.count ?? null],
-                  ["tree",    "Pipeline Tree",  null],
+                  ["strings",    "Strings",      suspicious.length],
+                  ["yara",       "YARA",          yaraMatches.length],
+                  ["binwalk",    "Binwalk",       binwalkFindings.length],
+                  ["arch",       "Arch",          archInfo.is_bare_metal ? 1 : null],
+                  ["sbom",       "SBOM",          compInfo.count ?? null],
+                  ["crypto",     "Crypto",        cryptoInfo.count ?? null],
+                  ["compliance", "Compliance",    (complianceData.mappings as unknown[])?.length ?? null],
+                  ["tree",       "Pipeline Tree", null],
                 ] as [typeof tab, string, number | null][]
               ).map(([t, label, count]) => (
                 <button
@@ -591,6 +593,11 @@ export default function ScanDetailPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Compliance tab */}
+            {tab === "compliance" && (
+              <CompliancePanel data={complianceData} />
             )}
 
             {/* Pipeline Tree tab */}
@@ -1638,3 +1645,115 @@ function buildPipelineData(filename: string, report: Record<string, any>, riskSc
 }
 
 // (old inline PhaseSection / PhaseIcons / PipelineTree removed — see src/components/PipelineTree.tsx)
+
+
+// ── Compliance panel ──────────────────────────────────────────────────────────
+
+interface ComplianceMapping {
+  finding:   string;
+  source:    string;
+  cwe:       string[];
+  eu_cra:    string[];
+  iec_62443: string[];
+  fda:       string[];
+}
+interface ComplianceSummary {
+  cwe:       string[];
+  eu_cra:    string[];
+  iec_62443: string[];
+  fda:       string[];
+}
+interface ComplianceData {
+  mappings:  ComplianceMapping[];
+  summary:   ComplianceSummary;
+  error?:    string | null;
+}
+
+const STD_META: { key: keyof ComplianceSummary; label: string; color: string }[] = [
+  { key: "cwe",       label: "CWE",          color: "text-red-400 bg-red-500/10 border-red-500/25" },
+  { key: "eu_cra",    label: "EU CRA",        color: "text-blue-400 bg-blue-500/10 border-blue-500/25" },
+  { key: "iec_62443", label: "IEC 62443-4-2", color: "text-purple-400 bg-purple-500/10 border-purple-500/25" },
+  { key: "fda",       label: "FDA",           color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25" },
+];
+
+function StdChip({ label, color }: { label: string; color: string }) {
+  return (
+    <span className={`inline-block rounded border px-2 py-0.5 text-[10px] font-mono font-semibold whitespace-nowrap ${color}`}>
+      {label}
+    </span>
+  );
+}
+
+function CompliancePanel({ data }: { data: unknown }) {
+  const d = data as ComplianceData | null | undefined;
+  const mappings: ComplianceMapping[] = d?.mappings ?? [];
+  const summary:  ComplianceSummary  = d?.summary  ?? { cwe: [], eu_cra: [], iec_62443: [], fda: [] };
+
+  if (!d || mappings.length === 0) {
+    return (
+      <div className="text-center py-12 text-slate-500">
+        <p className="text-sm">No compliance mappings found.</p>
+        <p className="text-xs mt-1 text-slate-600">Run a scan with findings to generate compliance data.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Summary chips */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {STD_META.map(({ key, label, color }) => (
+          <div key={key} className="rounded-xl border border-[#1f2840] p-3" style={{ background: "#0b0f1a" }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">{label}</p>
+            <div className="flex flex-wrap gap-1">
+              {(summary[key] ?? []).length === 0 ? (
+                <span className="text-xs text-slate-700">None</span>
+              ) : (
+                (summary[key] ?? []).map((ref: string) => (
+                  <StdChip key={ref} label={ref} color={color} />
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mapping table */}
+      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+          <span>Finding</span>
+          <span>CWE</span>
+          <span>EU CRA</span>
+          <span>IEC 62443</span>
+          <span>FDA</span>
+        </div>
+        <div className="divide-y divide-[#1a2234] max-h-[520px] overflow-y-auto">
+          {mappings.map((m, i) => (
+            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 items-start px-3 py-2.5 hover:bg-[#161d2e] transition-colors">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-200 leading-snug">{m.finding}</p>
+                <p className="text-[10px] font-mono text-slate-700 mt-0.5 truncate">{m.source}</p>
+              </div>
+              <div className="flex flex-wrap gap-1 justify-end max-w-[9rem]">
+                {(m.cwe ?? []).map((ref: string) => <StdChip key={ref} label={ref} color={STD_META[0].color} />)}
+              </div>
+              <div className="flex flex-wrap gap-1 justify-end max-w-[9rem]">
+                {(m.eu_cra ?? []).map((ref: string) => <StdChip key={ref} label={ref} color={STD_META[1].color} />)}
+              </div>
+              <div className="flex flex-wrap gap-1 justify-end max-w-[6rem]">
+                {(m.iec_62443 ?? []).map((ref: string) => <StdChip key={ref} label={ref} color={STD_META[2].color} />)}
+              </div>
+              <div className="flex flex-wrap gap-1 justify-end max-w-[9rem]">
+                {(m.fda ?? []).map((ref: string) => <StdChip key={ref} label={ref} color={STD_META[3].color} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {d?.error && (
+        <p className="text-xs text-red-400 font-mono">compliance error: {d.error}</p>
+      )}
+    </div>
+  );
+}
