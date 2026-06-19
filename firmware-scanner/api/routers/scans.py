@@ -504,6 +504,143 @@ def trigger_disasm(
     return _to_detail(scan)
 
 
+_MAX_FN_BYTES = 4096  # 4 KB ceiling for per-function disasm slice
+
+
+@router.get(
+    "/{scan_id}/function/disasm",
+    summary="On-demand capstone Thumb-2 disassembly for a single decompiled function",
+)
+def get_function_disasm(
+    scan_id: str,
+    request: Request,
+    addr: str = Query(..., description="Function entry address from decompile results (e.g. '0800a098')"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_analyst),
+) -> list[dict]:
+    """Disassemble one function's byte range from the stored firmware using capstone.
+
+    Size is inferred from the gap to the next function in decompile_json (capped at
+    4 KB). No new Ghidra run occurs — only the stored binary is read, never executed.
+    """
+    scan = _get_scan(scan_id, current_user, db, request=request, action="view_function_disasm")
+
+    if scan.decompile_status != "completed" or not scan.decompile_json:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Decompilation results are not available for this scan",
+        )
+    if not scan.stored_path or not storage.exists(scan.stored_path):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Original firmware file is no longer available",
+        )
+
+    # Parse target address — handles both "0800a098" (Ghidra) and "0x0800a098"
+    try:
+        target_addr = int(addr.strip(), 16)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid address value: {addr!r}",
+        )
+
+    decompile_data = json.loads(scan.decompile_json)
+    all_fns: list[dict] = decompile_data.get("functions", [])
+
+    # Collect all function addresses as integers
+    fn_int_addrs: list[int] = []
+    for fn in all_fns:
+        try:
+            fn_int_addrs.append(int(fn["address"], 16))
+        except (ValueError, KeyError, TypeError):
+            pass
+
+    if target_addr not in fn_int_addrs:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Function at 0x{target_addr:08x} not found in decompile results",
+        )
+
+    # Size = gap to next function address, capped at _MAX_FN_BYTES
+    sorted_addrs = sorted(set(fn_int_addrs))
+    try:
+        idx = sorted_addrs.index(target_addr)
+        if idx + 1 < len(sorted_addrs):
+            fn_size = min(sorted_addrs[idx + 1] - target_addr, _MAX_FN_BYTES)
+        else:
+            fn_size = _MAX_FN_BYTES
+    except ValueError:
+        fn_size = _MAX_FN_BYTES
+    fn_size = max(fn_size, 2)
+
+    # Load address from arch info in the main report
+    load_addr = 0x0800_0000  # STM32 flash default
+    if scan.report_json:
+        arch_info = json.loads(scan.report_json).get("arch", {})
+        raw_la = arch_info.get("inferred_load_address")
+        if raw_la is not None:
+            try:
+                load_addr = int(str(raw_la), 16)
+            except (ValueError, TypeError):
+                pass
+
+    file_offset = target_addr - load_addr
+    if file_offset < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Function address 0x{target_addr:08x} is below "
+                f"load address 0x{load_addr:08x}"
+            ),
+        )
+
+    # Read the relevant byte slice from firmware (read-only, never executed)
+    local_path, is_temp = storage.resolve_for_analysis(scan.stored_path)
+    try:
+        fw_data = local_path.read_bytes()
+    finally:
+        storage.cleanup_temp(local_path, is_temp)
+
+    end_offset = min(file_offset + fn_size, len(fw_data))
+    fn_bytes = fw_data[file_offset:end_offset]
+    if not fn_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No firmware bytes available at that address range",
+        )
+
+    # Disassemble with capstone (Thumb-2, skipdata so we don't stop at data gaps)
+    try:
+        import capstone
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="capstone is not installed on this server — pip install capstone",
+        )
+
+    md = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+    md.detail   = False
+    md.skipdata = True
+
+    instructions: list[dict] = []
+    for insn in md.disasm(fn_bytes, target_addr):
+        if insn.mnemonic.startswith("."):   # skip .byte / .short skipdata placeholders
+            continue
+        instructions.append({
+            "addr":     f"0x{insn.address:08x}",
+            "bytes":    insn.bytes.hex(" "),
+            "mnemonic": insn.mnemonic,
+            "op_str":   insn.op_str,
+        })
+
+    log_action(
+        db, action="view_function_disasm", user=current_user, resource_type="scan",
+        resource_id=scan_id, detail=f"addr=0x{target_addr:08x}", request=request,
+    )
+    return instructions
+
+
 @router.delete(
     "/{scan_id}",
     status_code=status.HTTP_204_NO_CONTENT,

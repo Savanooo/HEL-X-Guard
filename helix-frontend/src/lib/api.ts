@@ -188,6 +188,16 @@ export const triggerDisasm = (id: string, arch = "thumb") =>
     body: JSON.stringify({ arch }),
   });
 
+export interface FnInsn {
+  addr: string;
+  bytes: string;
+  mnemonic: string;
+  op_str: string;
+}
+
+export const getFunctionDisasm = (scanId: string, addr: string) =>
+  req<FnInsn[]>(`/api/v1/scans/${scanId}/function/disasm?addr=${encodeURIComponent(addr)}`);
+
 /** Downloads the PDF report. Uses fetch (not a plain <a href>) because the
  * endpoint requires a Bearer token, which anchor tags can't send. */
 export async function downloadReportPdf(id: string, suggestedName: string): Promise<void> {

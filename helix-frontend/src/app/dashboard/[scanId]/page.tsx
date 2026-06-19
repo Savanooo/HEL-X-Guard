@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getScan, triggerExtract, triggerDecompile, triggerCve, triggerDisasm, downloadReportPdf, type Scan } from "@/lib/api";
+import { getScan, triggerExtract, triggerDecompile, triggerCve, triggerDisasm, downloadReportPdf, getFunctionDisasm, type Scan, type FnInsn } from "@/lib/api";
 import RiskBadge from "@/components/RiskBadge";
 import RiskGauge from "@/components/RiskGauge";
 import StatusBadge from "@/components/StatusBadge";
@@ -718,7 +718,7 @@ export default function ScanDetailPage() {
             {scan.decompile?.functions && scan.decompile.functions.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Decompiled Functions</p>
-                <DecompileFunctions functions={scan.decompile.functions} />
+                <DecompileFunctions functions={scan.decompile.functions} scanId={scanId} />
               </div>
             )}
 
@@ -877,11 +877,31 @@ function groupByBlock(fns: FnEntry[], blockSize = 0x1000) {
     }));
 }
 
-function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="text-[10px] font-mono text-slate-600 hover:text-slate-300 transition-colors px-1.5 py-0.5 rounded border border-transparent hover:border-[#2d3a54]"
+    >
+      {copied ? "✓ copied" : "copy"}
+    </button>
+  );
+}
+
+function DecompileFunctions({ functions, scanId }: { functions: FnEntry[]; scanId: string }) {
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const [openFn, setOpenFn]         = useState<string | null>(null);
   const [search, setSearch]         = useState("");
   const [searchCode, setSearchCode] = useState(false);
+  const [asmCache, setAsmCache]     = useState<Map<string, FnInsn[] | "error">>(new Map());
+  const [asmLoading, setAsmLoading] = useState<Set<string>>(new Set());
 
   const q        = search.toLowerCase();
   const filtered = q
@@ -905,6 +925,24 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
+  }
+
+  async function fetchFnAsm(fnAddr: string) {
+    setAsmLoading(prev => { const n = new Set(prev); n.add(fnAddr); return n; });
+    try {
+      const insns = await getFunctionDisasm(scanId, fnAddr);
+      setAsmCache(prev => { const m = new Map(prev); m.set(fnAddr, insns); return m; });
+    } catch {
+      setAsmCache(prev => { const m = new Map(prev); m.set(fnAddr, "error" as const); return m; });
+    } finally {
+      setAsmLoading(prev => { const n = new Set(prev); n.delete(fnAddr); return n; });
+    }
+  }
+
+  function handleFnClick(fnKey: string, fnAddr: string) {
+    if (openFn === fnKey) { setOpenFn(null); return; }
+    setOpenFn(fnKey);
+    if (!asmCache.has(fnAddr) && !asmLoading.has(fnAddr)) void fetchFnAsm(fnAddr);
   }
 
   function densityColor(count: number) {
@@ -1013,15 +1051,24 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
                   {/* Expanded: function list */}
                   {isOpen && (
                     <div className="border-t border-[#1f2840] bg-[#080c14]">
-                      {/* Function rows — 2 columns on wider screens */}
                       <div className="divide-y divide-[#1a2234]">
                         {items.map((fn, idx) => {
-                          const fnKey = `${key}:${idx}`;
+                          const fnKey    = `${key}:${idx}`;
                           const isFnOpen = openFn === fnKey;
+                          const cached   = asmCache.get(fn.address);
+                          const asmErr   = cached === "error";
+                          const asmInsns = asmErr ? null : (cached ?? null);
+                          const loading  = asmLoading.has(fn.address);
+                          const asmText  = asmInsns
+                            ? asmInsns.map(i =>
+                                `${i.addr}  ${i.bytes.padEnd(12, " ")}  ${i.mnemonic.padEnd(8, " ")} ${i.op_str}`
+                              ).join("\n")
+                            : "";
+
                           return (
                             <div key={fnKey}>
                               <button
-                                onClick={() => setOpenFn(isFnOpen ? null : fnKey)}
+                                onClick={() => handleFnClick(fnKey, fn.address)}
                                 className="w-full flex items-center gap-3 pl-10 pr-4 py-1.5 text-left hover:bg-[#161d2e]/60 transition-colors group"
                               >
                                 {/* tiny fn chevron */}
@@ -1044,10 +1091,62 @@ function DecompileFunctions({ functions }: { functions: FnEntry[] }) {
                                   </span>
                                 )}
                               </button>
+
+                              {/* Two-column drill-down: Capstone ASM | Ghidra Pseudo-C */}
                               {isFnOpen && (
-                                <pre className="text-[11px] leading-relaxed font-mono text-emerald-300/90 bg-[#060b10] pl-16 pr-4 py-3 overflow-x-auto max-h-80 whitespace-pre-wrap break-all border-t border-[#1f2840]">
-                                  {fn.code || "(no pseudocode)"}
-                                </pre>
+                                <TabErrorBoundary tabKey={fnKey}>
+                                  <div className="border-t border-[#1f2840] grid grid-cols-2 divide-x divide-[#1f2840]" style={{ background: "#060b10" }}>
+
+                                    {/* LEFT — Capstone Assembly */}
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#1f2840]" style={{ background: "#080c14" }}>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Assembly · Capstone · Thumb-2</span>
+                                        <CopyButton text={asmText} />
+                                      </div>
+                                      <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 320 }}>
+                                        {loading ? (
+                                          <div className="flex items-center justify-center py-6">
+                                            <Spinner size={16} />
+                                          </div>
+                                        ) : asmErr ? (
+                                          <p className="text-xs text-red-400 font-mono px-3 py-3">Failed to load disassembly.</p>
+                                        ) : !asmInsns ? (
+                                          <p className="text-[11px] text-slate-600 font-mono px-3 py-3">Fetching…</p>
+                                        ) : asmInsns.length === 0 ? (
+                                          <p className="text-[11px] text-slate-500 font-mono px-3 py-3">No instructions decoded at this address.</p>
+                                        ) : (
+                                          <table className="w-full text-[11px] font-mono border-collapse">
+                                            <tbody>
+                                              {asmInsns.map((insn, i) => (
+                                                <tr key={i} className="hover:bg-[#161d2e] transition-colors">
+                                                  <td className="text-slate-600 pl-3 pr-2 py-0.5 whitespace-nowrap select-all w-[7rem]">{insn.addr}</td>
+                                                  <td className="text-slate-700 pr-2 py-0.5 whitespace-nowrap w-[5rem]">{insn.bytes}</td>
+                                                  <td className="text-blue-300 font-semibold pr-2 py-0.5 whitespace-nowrap w-[4rem]">{insn.mnemonic}</td>
+                                                  <td className="text-slate-300 pr-3 py-0.5">{insn.op_str}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* RIGHT — Ghidra Pseudo-C */}
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#1f2840]" style={{ background: "#080c14" }}>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Pseudo-C · Ghidra · reconstructed</span>
+                                        <CopyButton text={fn.code || ""} />
+                                      </div>
+                                      <pre
+                                        className="text-[11px] leading-relaxed font-mono text-emerald-300/90 px-3 py-2 overflow-y-auto overflow-x-auto whitespace-pre"
+                                        style={{ maxHeight: 320 }}
+                                      >
+                                        {fn.code || "(no decompiled output for this function)"}
+                                      </pre>
+                                    </div>
+
+                                  </div>
+                                </TabErrorBoundary>
                               )}
                             </div>
                           );
