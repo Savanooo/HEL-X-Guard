@@ -58,6 +58,9 @@ def _to_detail(scan: Scan) -> ScanDetailResponse:
     # Rootfs is stored inside extraction_json["rootfs"] (Feature 5)
     if detail.extraction and isinstance(detail.extraction.get("rootfs"), dict):
         detail.rootfs = detail.extraction["rootfs"]
+    # Call graph is stored inside decompile_json["call_graph"] (Feature 6)
+    if detail.decompile and isinstance(detail.decompile.get("call_graph"), dict):
+        detail.call_graph = detail.decompile["call_graph"]
     return detail
 
 

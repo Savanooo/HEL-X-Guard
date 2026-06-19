@@ -365,7 +365,7 @@ def _run_decompile(scan_id: str, stored_path: str,
         scan.decompile_status = "running"
         db.commit()
 
-        from firmware_scanner import ghidra_runner, string_xref
+        from firmware_scanner import call_graph, ghidra_runner, string_xref
 
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
@@ -383,6 +383,13 @@ def _run_decompile(scan_id: str, stored_path: str,
                 report_data = json.loads(scan_tmp.report_json)
                 strings_r   = report_data.get("strings", {})
                 result["xrefs"] = string_xref.analyze(result, strings_r)
+            except Exception:
+                pass
+
+        # Build call graph + function naming labels (Feature 6)
+        if result.get("functions"):
+            try:
+                result["call_graph"] = call_graph.analyze(result)
             except Exception:
                 pass
 

@@ -975,7 +975,16 @@ export default function ScanDetailPage() {
             {scan.decompile?.functions && scan.decompile.functions.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Decompiled Functions</p>
-                <DecompileFunctions functions={scan.decompile.functions} scanId={scanId} />
+                <DecompileFunctions
+                  functions={scan.decompile.functions}
+                  scanId={scanId}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  callersMap={(scan as any).call_graph?.callers_by_address ?? {}}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  calleesMap={(scan as any).call_graph?.callees_by_address ?? {}}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  namedFunctions={(scan as any).call_graph?.named_functions ?? []}
+                />
               </div>
             )}
 
@@ -1152,7 +1161,15 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function DecompileFunctions({ functions, scanId }: { functions: FnEntry[]; scanId: string }) {
+function DecompileFunctions({
+  functions, scanId, callersMap = {}, calleesMap = {}, namedFunctions = [],
+}: {
+  functions: FnEntry[];
+  scanId: string;
+  callersMap?: Record<string, string[]>;
+  calleesMap?: Record<string, string[]>;
+  namedFunctions?: { address: string; original_name: string; inferred_name: string; confidence: string; basis: string }[];
+}) {
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const [openFn, setOpenFn]         = useState<string | null>(null);
   const [search, setSearch]         = useState("");
@@ -1209,6 +1226,11 @@ function DecompileFunctions({ functions, scanId }: { functions: FnEntry[]; scanI
     if (pct > 0.20) return { bar: "bg-blue-500",    text: "text-blue-400" };
     return              { bar: "bg-slate-600",    text: "text-slate-500" };
   }
+
+  // Build address → name map for callers/callees display
+  const addrToName = new Map<string, string>(functions.map(f => [f.address, f.name]));
+  // Build address → inferred name map
+  const addrToInferred = new Map<string, string>(namedFunctions.map(n => [n.address, n.inferred_name]));
 
   const allOpen = openGroups.size === groups.length && groups.length > 0;
 
@@ -1403,6 +1425,48 @@ function DecompileFunctions({ functions, scanId }: { functions: FnEntry[]; scanI
                                     </div>
 
                                   </div>
+
+                                  {/* Callers / Callees + inferred name (Feature 6) */}
+                                  {(() => {
+                                    const normAddr = fn.address.toLowerCase();
+                                    const callers  = (callersMap[normAddr] ?? []);
+                                    const callees  = (calleesMap[normAddr] ?? []);
+                                    const inferred = addrToInferred.get(normAddr);
+                                    if (callers.length === 0 && callees.length === 0 && !inferred) return null;
+                                    return (
+                                      <div className="border-t border-[#1f2840] px-4 py-2 flex flex-wrap gap-6 text-[10px]" style={{ background: "#060b10" }}>
+                                        {inferred && (
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-slate-600 font-bold uppercase tracking-widest">Inferred:</span>
+                                            <span className="font-mono text-purple-400">{inferred}</span>
+                                          </div>
+                                        )}
+                                        {callers.length > 0 && (
+                                          <div>
+                                            <span className="text-slate-600 font-bold uppercase tracking-widest mr-1.5">Callers ({callers.length}):</span>
+                                            {callers.slice(0, 6).map((a, ci) => (
+                                              <span key={ci} className="font-mono text-blue-400 mr-2">
+                                                {addrToName.get(a) ?? a}
+                                              </span>
+                                            ))}
+                                            {callers.length > 6 && <span className="text-slate-600">+{callers.length - 6}</span>}
+                                          </div>
+                                        )}
+                                        {callees.length > 0 && (
+                                          <div>
+                                            <span className="text-slate-600 font-bold uppercase tracking-widest mr-1.5">Callees ({callees.length}):</span>
+                                            {callees.slice(0, 6).map((a, ci) => (
+                                              <span key={ci} className="font-mono text-emerald-400 mr-2">
+                                                {addrToName.get(a) ?? a}
+                                              </span>
+                                            ))}
+                                            {callees.length > 6 && <span className="text-slate-600">+{callees.length - 6}</span>}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+
                                 </TabErrorBoundary>
                               )}
                             </div>

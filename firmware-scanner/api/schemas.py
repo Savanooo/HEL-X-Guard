@@ -76,6 +76,8 @@ class ScanDetailResponse(ScanResponse):
     disasm_error: str | None = None
     # Rootfs deep analysis (Feature 5) — stored inside extraction_json["rootfs"]
     rootfs: dict[str, Any] | None = None
+    # Call graph + function naming (Feature 6) — stored inside decompile_json["call_graph"]
+    call_graph: dict[str, Any] | None = None
 
 
 class ScanListResponse(BaseModel):
