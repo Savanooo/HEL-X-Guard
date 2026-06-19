@@ -291,6 +291,58 @@ export interface ScanDiff {
 export const diffScans = (idA: string, idB: string) =>
   req<ScanDiff>(`/api/v1/scans/${idA}/diff/${idB}`);
 
+// ── Firmware version tracking ─────────────────────────────────────────────────
+
+export interface FirmwareScanMeta {
+  id: string;
+  filename: string;
+  device_label: string | null;
+  risk_score: number | null;
+  risk_level: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+  entropy: number | null;
+  file_size: number | null;
+  yara_count: number;
+  suspicious_count: number;
+  sha256: string | null;
+}
+
+export interface FirmwareSeries {
+  items: FirmwareScanMeta[];
+  count: number;
+}
+
+export interface FirmwareRegressionSummary {
+  risk_direction: "worse" | "better" | "unchanged";
+  yara_new: number;
+  yara_resolved: number;
+  strings_appeared: number;
+  strings_removed: number;
+}
+
+export interface FirmwareRegression {
+  scan_a: FirmwareScanMeta;
+  scan_b: FirmwareScanMeta;
+  risk_delta: number;
+  entropy_delta: number;
+  yara_appeared: string[];
+  yara_resolved: string[];
+  strings_appeared: { value: string; category: string }[];
+  strings_removed: { value: string; category: string }[];
+  summary: FirmwareRegressionSummary;
+}
+
+export const getFirmwareSeries = (params: { stem?: string; device_label?: string }) => {
+  const q = new URLSearchParams();
+  if (params.stem) q.set("stem", params.stem);
+  if (params.device_label) q.set("device_label", params.device_label);
+  return req<FirmwareSeries>(`/api/v1/firmware/series?${q}`);
+};
+
+export const getFirmwareRegression = (scanAId: string, scanBId: string) =>
+  req<FirmwareRegression>(`/api/v1/firmware/regression/${scanAId}/${scanBId}`);
+
 // ── Audit ─────────────────────────────────────────────────────────────────────
 
 export const listAuditLog = (

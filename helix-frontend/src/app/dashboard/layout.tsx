@@ -20,13 +20,18 @@ function IconShield() {
 function IconDiff() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
 }
+function IconHistory() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 21v-4h4"/></svg>;
+}
 
 const PAGE_TITLES: Record<string, string> = {
-  "/dashboard":        "Scan History",
-  "/dashboard/upload": "New Scan",
-  "/dashboard/diff":   "Firmware Compare",
-  "/dashboard/users":  "User Management",
-  "/dashboard/audit":  "Audit Log",
+  "/dashboard":             "Scan History",
+  "/dashboard/upload":      "New Scan",
+  "/dashboard/diff":        "Firmware Compare",
+  "/dashboard/firmware":    "Firmware Lineage",
+  "/dashboard/rules":       "YARA Rules",
+  "/dashboard/users":       "User Management",
+  "/dashboard/audit":       "Audit Log",
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -50,9 +55,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   function signOut() { clearToken(); router.push("/login"); }
 
   const mainLinks = [
-    { href: "/dashboard",        label: "Scans",    Icon: IconScans  },
-    { href: "/dashboard/upload", label: "New Scan", Icon: IconUpload },
-    { href: "/dashboard/diff",   label: "Compare",  Icon: IconDiff   },
+    { href: "/dashboard",             label: "Scans",    Icon: IconScans   },
+    { href: "/dashboard/upload",      label: "New Scan", Icon: IconUpload  },
+    { href: "/dashboard/diff",        label: "Compare",  Icon: IconDiff    },
+    { href: "/dashboard/firmware",    label: "Lineage",  Icon: IconHistory },
+    { href: "/dashboard/rules",       label: "YARA Rules", Icon: IconShield },
   ];
   const adminLinks = user.role === "admin" ? [
     { href: "/dashboard/users", label: "Users",     Icon: IconUsers  },

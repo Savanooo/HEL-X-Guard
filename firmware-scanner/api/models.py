@@ -96,6 +96,12 @@ class Scan(Base):
     disasm_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     disasm_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Optional device identifier for grouping scans into a firmware lineage.
+    # When set, overrides filename-stem grouping in the /firmware/series endpoint.
+    device_label: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, index=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, index=True
     )
