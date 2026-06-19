@@ -574,8 +574,9 @@ def get_function_disasm(
         fn_size = _MAX_FN_BYTES
     fn_size = max(fn_size, 2)
 
-    # Load address from arch info in the main report
+    # Load address + capstone arch from arch info in the main report
     load_addr = 0x0800_0000  # STM32 flash default
+    arch_info: dict = {}
     if scan.report_json:
         arch_info = json.loads(scan.report_json).get("arch", {})
         raw_la = arch_info.get("inferred_load_address")
@@ -610,7 +611,7 @@ def get_function_disasm(
             detail="No firmware bytes available at that address range",
         )
 
-    # Disassemble with capstone (Thumb-2, skipdata so we don't stop at data gaps)
+    # Disassemble with capstone — use detected arch, fall back to Thumb-2
     try:
         import capstone
     except ImportError:
@@ -619,7 +620,19 @@ def get_function_disasm(
             detail="capstone is not installed on this server — pip install capstone",
         )
 
-    md = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+    cap_arch = capstone.CS_ARCH_ARM   # default: ARM Thumb (Cortex-M)
+    cap_mode = capstone.CS_MODE_THUMB
+    # arch_info already extracted above for load_addr; reuse it for arch detection
+    _raw_arch = arch_info.get("capstone_arch")
+    _raw_mode = arch_info.get("capstone_mode")
+    if _raw_arch is not None and _raw_mode is not None:
+        try:
+            cap_arch = int(_raw_arch)
+            cap_mode = int(_raw_mode)
+        except (TypeError, ValueError):
+            pass
+
+    md = capstone.Cs(cap_arch, cap_mode)
     md.detail   = False
     md.skipdata = True
 
