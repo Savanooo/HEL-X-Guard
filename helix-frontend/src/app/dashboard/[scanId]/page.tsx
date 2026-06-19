@@ -83,7 +83,7 @@ export default function ScanDetailPage() {
   const router = useRouter();
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree" | "arch" | "sbom" | "crypto" | "compliance">("strings");
+  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree" | "arch" | "sbom" | "crypto" | "compliance" | "peripherals">("strings");
   const [extractError, setExtractError] = useState("");
   const [decompileError, setDecompileError] = useState("");
   const [triggeringExtract, setTriggeringExtract] = useState(false);
@@ -227,6 +227,7 @@ export default function ScanDetailPage() {
   const complianceData = report?.compliance ?? { mappings: [], summary: { cwe: [], eu_cra: [], iec_62443: [], fda: [] } };
   const cveResult      = scan.cve           ?? {};
   const disasmResult   = scan.disasm        ?? {};
+  const peripheralInfo = report?.peripherals ?? { available: false, peripherals: [], flags: [], flag_names: [] };
 
   const suspicious: { value: string; category: string; offset: number; encoding: string }[] =
     stringsInfo.suspicious ?? [];
@@ -393,7 +394,8 @@ export default function ScanDetailPage() {
                   ["arch",       "Arch",          archInfo.is_bare_metal ? 1 : null],
                   ["sbom",       "SBOM",          compInfo.count ?? null],
                   ["crypto",     "Crypto",        cryptoInfo.count ?? null],
-                  ["compliance", "Compliance",    (complianceData.mappings as unknown[])?.length ?? null],
+                  ["compliance",  "Compliance",    (complianceData.mappings as unknown[])?.length ?? null],
+                  ["peripherals","Peripherals",   (peripheralInfo.peripherals as unknown[])?.length || null],
                   ["tree",       "Pipeline Tree", null],
                 ] as [typeof tab, string, number | null][]
               ).map(([t, label, count]) => (
@@ -608,6 +610,75 @@ export default function ScanDetailPage() {
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Peripherals tab */}
+            {tab === "peripherals" && (
+              <div className="space-y-4">
+                {!peripheralInfo.available ? (
+                  <p className="text-sm text-slate-500 text-center py-8">
+                    Peripheral map not available — only generated for bare-metal Cortex-M firmware.
+                  </p>
+                ) : (
+                  <>
+                    {/* Security flags */}
+                    {Array.isArray(peripheralInfo.flags) && peripheralInfo.flags.length > 0 && (
+                      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                        <div className="px-4 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                          Security Flags
+                        </div>
+                        <div className="divide-y divide-[#1f2840]">
+                          {(peripheralInfo.flags as { flag: string; severity: string; description: string; risk_score: number }[]).map((f, i) => (
+                            <div key={i} className="flex items-start gap-3 px-4 py-3">
+                              <span className={`mt-0.5 text-xs font-bold uppercase px-1.5 py-0.5 rounded flex-shrink-0 ${
+                                f.severity === "critical" ? "bg-red-900/40 text-red-400" :
+                                f.severity === "high"     ? "bg-orange-900/40 text-orange-400" :
+                                                            "bg-amber-900/30 text-amber-400"
+                              }`}>{f.severity}</span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-200 font-mono">{f.flag}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">{f.description}</p>
+                              </div>
+                              <span className="ml-auto text-xs text-slate-500 flex-shrink-0">+{f.risk_score} risk</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Peripheral accesses */}
+                    {Array.isArray(peripheralInfo.peripherals) && peripheralInfo.peripherals.length > 0 ? (
+                      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                        <div className="grid grid-cols-[10rem_6rem_4rem_1fr] px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                          <span>Peripheral</span>
+                          <span>Base</span>
+                          <span>Accesses</span>
+                          <span>Category</span>
+                        </div>
+                        <div className="max-h-96 overflow-y-auto divide-y divide-[#1f2840]">
+                          {(peripheralInfo.peripherals as { name: string; base: string; access_count: number; category: string; families: string }[]).map((p, i) => (
+                            <div key={i} className="grid grid-cols-[10rem_6rem_4rem_1fr] px-3 py-2 hover:bg-[#161d2e] transition-colors text-xs">
+                              <span className="font-mono font-semibold text-blue-300">{p.name}</span>
+                              <span className="font-mono text-slate-400">{p.base}</span>
+                              <span className="text-slate-300 font-semibold">{p.access_count}</span>
+                              <span className={`font-medium ${
+                                p.category === "debug"    ? "text-amber-400" :
+                                p.category === "flash"    ? "text-orange-400" :
+                                p.category === "watchdog" ? "text-yellow-400" :
+                                p.category === "security" ? "text-red-400" :
+                                p.category === "crypto"   ? "text-purple-400" :
+                                                            "text-slate-500"
+                              }`}>{p.category}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500 text-center py-4">No peripheral accesses detected.</p>
+                    )}
+                  </>
                 )}
               </div>
             )}

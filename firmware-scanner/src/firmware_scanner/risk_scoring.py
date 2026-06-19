@@ -58,6 +58,12 @@ CAP_CVE         = 30   # cap across all CVE contributions
 W_EMBEDDED_CERT = 5    # embedded X.509 cert is worth noting
 CAP_CERT        = 5    # usually just one cert per firmware
 
+# Peripheral flags (peripheral_map.py — Feature 2)
+W_PERIPH_DEBUG_OPEN  = 10   # debug port left enabled in production
+W_PERIPH_WDT_DISABLE = 10   # watchdog disable pattern detected
+W_PERIPH_RDP_BYPASS  = 15   # RDP readout-protection downgrade risk
+W_PERIPH_FLASH_WRITE =  8   # firmware can write its own flash
+
 # YARA bootloader/SWD-enable — extra weight for critical MCU rules
 W_YARA_SWD_BOOTLOADER = 20  # applied on top of YARA_WEIGHTS for matching rules
 _SWD_BOOTLOADER_RULES = frozenset({
@@ -92,6 +98,7 @@ def score(
     checksec_result: dict | None = None,
     cve_result: dict | None = None,
     cert_result: dict | None = None,
+    peripheral_result: dict | None = None,
 ) -> dict:
     """Compute a weighted risk score from all analysis module outputs.
 
@@ -282,6 +289,26 @@ def score(
             if expired:
                 msg += f" — {expired} expired"
             reasons.append(msg)
+
+    # ── Peripheral flags (Feature 2) ─────────────────────────────
+    if peripheral_result and peripheral_result.get("available"):
+        _flag_weights = {
+            "debug_port_left_open": W_PERIPH_DEBUG_OPEN,
+            "watchdog_disabled":    W_PERIPH_WDT_DISABLE,
+            "rdp_bypass_risk":      W_PERIPH_RDP_BYPASS,
+            "flash_write_detected": W_PERIPH_FLASH_WRITE,
+        }
+        _flag_msgs = {
+            "debug_port_left_open": "Peripheral map: debug port (DBGMCU/DWT/ITM) left enabled in production",
+            "watchdog_disabled":    "Peripheral map: watchdog disable pattern detected (IWDG/WWDG)",
+            "rdp_bypass_risk":      "Peripheral map: RDP option-byte access — possible readout-protection bypass",
+            "flash_write_detected": "Peripheral map: FLASH controller write access detected",
+        }
+        for flag_name in peripheral_result.get("flag_names", []):
+            w = _flag_weights.get(flag_name, 0)
+            if w:
+                total += w
+                reasons.append(_flag_msgs.get(flag_name, f"Peripheral flag: {flag_name}"))
 
     # Clamp to 0–100
     final_score = max(0, min(100, total))

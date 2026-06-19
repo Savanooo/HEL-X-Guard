@@ -48,6 +48,7 @@ def build(
     crypto_result: dict | None = None,
     components_result: dict | None = None,
     cert_result: dict | None = None,
+    peripheral_result: dict | None = None,
     firmware_info: dict | None = None,
     display_name: str | None = None,
 ) -> dict:
@@ -84,6 +85,8 @@ def build(
         "crypto":      crypto_result if crypto_result is not None else {"matches": [], "count": 0},
         "components":  components_result if components_result is not None else {"components": [], "count": 0},
         "certs":       cert_result if cert_result is not None else {"certificates": [], "count": 0},
+        "peripherals": peripheral_result if peripheral_result is not None
+                       else {"available": False, "peripherals": [], "flags": [], "flag_names": []},
         "risk":        risk_result,
     }
 

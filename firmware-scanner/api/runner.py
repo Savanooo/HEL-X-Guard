@@ -83,6 +83,7 @@ def _run_local(
         elf_analysis,
         entropy,
         hashing,
+        peripheral_map,
         report,
         risk_scoring,
         strings_scan,
@@ -107,11 +108,13 @@ def _run_local(
     crypto_r  = crypto_constants.analyze(firmware_path)
     comp_r    = components.analyze(firmware_path)
     cert_r    = cert_extract.analyze(firmware_path)
+    periph_r  = peripheral_map.analyze(firmware_path, arch_r)
 
     risk_r = risk_scoring.score(
         entropy_r, strings_r, yara_r, binwalk_r, elf_r,
         checksec_result=checksec_r,
         cert_result=cert_r,
+        peripheral_result=periph_r,
     )
 
     result = report.build(
@@ -122,6 +125,7 @@ def _run_local(
         crypto_result=crypto_r,
         components_result=comp_r,
         cert_result=cert_r,
+        peripheral_result=periph_r,
         firmware_info=firmware_info,
         display_name=display_name,
     )
