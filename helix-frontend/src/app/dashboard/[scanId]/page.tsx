@@ -235,6 +235,15 @@ export default function ScanDetailPage() {
   const binwalkFindings: { description: string; offset: number }[] =
     binwalkInfo.findings ?? [];
 
+  // String → function cross-references (populated after Ghidra decompile)
+  type XrefFn = { name: string; address: string };
+  const xrefList: { value: string; category: string; functions: XrefFn[] }[] =
+    (scan.decompile as { xrefs?: { available: boolean; xrefs: { value: string; category: string; functions: XrefFn[] }[] } } | null)
+      ?.xrefs?.xrefs ?? [];
+  const xrefByValue = new Map<string, XrefFn[]>(
+    xrefList.map(x => [x.value, x.functions])
+  );
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -417,19 +426,27 @@ export default function ScanDetailPage() {
               ) : (
                 <div className="rounded-lg border border-[#1f2840] overflow-hidden">
                   <div className="max-h-[480px] overflow-y-auto divide-y divide-[#1f2840]">
-                    {suspicious.map((s, i) => (
-                      <div key={i} className="flex items-center gap-3 px-3 py-2 hover:bg-[#161d2e] transition-colors">
-                        <span className="w-32 flex-shrink-0">
-                          <CategoryBadge cat={s.category} />
-                        </span>
-                        <span className="font-mono text-xs text-slate-300 break-all flex-1 leading-relaxed">
-                          {s.value.length > 140 ? s.value.slice(0, 140) + "…" : s.value}
-                        </span>
-                        <span className="text-xs text-slate-600 font-mono whitespace-nowrap">
-                          0x{s.offset.toString(16).padStart(6, "0")}
-                        </span>
-                      </div>
-                    ))}
+                    {suspicious.map((s, i) => {
+                      const fns = xrefByValue.get(s.value);
+                      return (
+                        <div key={i} className="flex items-center gap-3 px-3 py-2 hover:bg-[#161d2e] transition-colors">
+                          <span className="w-32 flex-shrink-0">
+                            <CategoryBadge cat={s.category} />
+                          </span>
+                          <span className="font-mono text-xs text-slate-300 break-all flex-1 leading-relaxed">
+                            {s.value.length > 140 ? s.value.slice(0, 140) + "…" : s.value}
+                          </span>
+                          {fns && fns.length > 0 && (
+                            <span className="flex-shrink-0">
+                              <XrefBadge fns={fns} />
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-600 font-mono whitespace-nowrap">
+                            0x{s.offset.toString(16).padStart(6, "0")}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )
@@ -1317,6 +1334,43 @@ function DisasmResults({ disasm }: { disasm: Record<string, unknown> }) {
         <p className="text-[11px] text-slate-500 font-mono">error: {disasm.error}</p>
       )}
     </div>
+  );
+}
+
+
+// ── String → function xref badge ─────────────────────────────────────────────
+
+function XrefBadge({ fns }: { fns: { name: string; address: string }[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 transition-colors"
+        title={`Referenced in ${fns.length} decompiled function${fns.length !== 1 ? "s" : ""}`}
+      >
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+        {fns.length} fn
+      </button>
+      {open && (
+        <span
+          className="absolute right-0 top-6 z-50 min-w-[14rem] rounded-lg border border-[#2d3a54] shadow-xl py-1"
+          style={{ background: "#0b0f1a" }}
+        >
+          <span className="block text-[9px] font-bold uppercase tracking-widest text-slate-600 px-3 py-1">
+            Referenced in:
+          </span>
+          {fns.map((fn, i) => (
+            <span key={i} className="flex items-center gap-2 px-3 py-1 hover:bg-[#161d2e]">
+              <span className="font-mono text-[10px] text-slate-500 flex-shrink-0">{fn.address}</span>
+              <span className="font-mono text-[11px] text-slate-200 truncate">{fn.name}</span>
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }
 

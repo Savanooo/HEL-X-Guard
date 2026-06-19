@@ -321,7 +321,7 @@ def _run_decompile(scan_id: str, stored_path: str,
         scan.decompile_status = "running"
         db.commit()
 
-        from firmware_scanner import ghidra_runner
+        from firmware_scanner import ghidra_runner, string_xref
 
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
@@ -331,6 +331,16 @@ def _run_decompile(scan_id: str, stored_path: str,
                                              base_address=base_address)
         finally:
             storage.cleanup_temp(local_path, is_temp)
+
+        # Enrich with string → function cross-references (pure Python, no re-run)
+        scan_tmp = db.get(Scan, scan_id)
+        if scan_tmp and scan_tmp.report_json and result.get("functions"):
+            try:
+                report_data = json.loads(scan_tmp.report_json)
+                strings_r   = report_data.get("strings", {})
+                result["xrefs"] = string_xref.analyze(result, strings_r)
+            except Exception:
+                pass
 
         scan = db.get(Scan, scan_id)
         if scan is not None:
