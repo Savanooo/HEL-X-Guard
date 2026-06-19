@@ -378,6 +378,14 @@ export default function ScanDetailPage() {
                 />
                 <KV label="Scanned" value={fmtDate(scan.completed_at)} />
               </dl>
+              {Array.isArray(entropyInfo.regions) && entropyInfo.regions.length > 0 && (
+                <div className="mt-3">
+                  <EntropyHeatmap
+                    regions={entropyInfo.regions as EntropyRegion[]}
+                    totalSize={fileInfo.size?.bytes ?? 0}
+                  />
+                </div>
+              )}
             </Section>
           </div>
 
@@ -1921,6 +1929,88 @@ function CompliancePanel({ data }: { data: unknown }) {
 
       {d?.error && (
         <p className="text-xs text-red-400 font-mono">compliance error: {d.error}</p>
+      )}
+    </div>
+  );
+}
+
+// ── Entropy heatmap (Feature 4) ───────────────────────────────────────────────
+// Renders an SVG horizontal strip where each region occupies space proportional
+// to its byte count, colored by entropy class.
+
+interface EntropyRegion {
+  offset: number;
+  size:   number;
+  entropy: number;
+  class:  string;
+  color:  string;
+}
+
+function EntropyHeatmap({ regions, totalSize }: { regions: EntropyRegion[]; totalSize: number }) {
+  if (!regions || regions.length === 0 || totalSize <= 0) return null;
+
+  const LEGEND: { label: string; color: string }[] = [
+    { label: "Encrypted",  color: "#ef4444" },
+    { label: "Compressed", color: "#f97316" },
+    { label: "Code",       color: "#3b82f6" },
+    { label: "Data",       color: "#8b5cf6" },
+    { label: "Text",       color: "#22c55e" },
+    { label: "Padding",    color: "#374151" },
+  ];
+
+  function fmtOffset(n: number) {
+    return "0x" + n.toString(16).toUpperCase().padStart(6, "0");
+  }
+
+  return (
+    <div className="rounded-lg border border-[#1f2840] p-4" style={{ background: "#0b0f1a" }}>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">Entropy Heatmap</p>
+
+      {/* SVG strip */}
+      <svg width="100%" height="28" className="rounded overflow-hidden mb-2">
+        {regions.map((r, i) => {
+          const x = (r.offset / totalSize) * 100;
+          const w = Math.max(0.15, (r.size / totalSize) * 100);
+          return (
+            <rect
+              key={i}
+              x={`${x}%`}
+              width={`${w}%`}
+              y={0}
+              height={28}
+              fill={r.color}
+            >
+              <title>{`${r.class} · ${fmtOffset(r.offset)} · ${r.size.toLocaleString()}B · entropy ${r.entropy.toFixed(2)}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {LEGEND.map(l => (
+          <span key={l.label} className="flex items-center gap-1 text-[10px] text-slate-400">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: l.color }} />
+            {l.label}
+          </span>
+        ))}
+      </div>
+
+      {/* Region table */}
+      {regions.length <= 20 && (
+        <div className="mt-3 divide-y divide-[#1f2840]">
+          <div className="grid grid-cols-[5rem_5rem_4rem_4rem] text-[9px] font-bold uppercase tracking-widest text-slate-600 pb-1">
+            <span>Offset</span><span>Size</span><span>Entropy</span><span>Class</span>
+          </div>
+          {regions.map((r, i) => (
+            <div key={i} className="grid grid-cols-[5rem_5rem_4rem_4rem] py-0.5 text-[10px] font-mono">
+              <span className="text-slate-500">{fmtOffset(r.offset)}</span>
+              <span className="text-slate-500">{r.size.toLocaleString()}B</span>
+              <span className="text-slate-400">{r.entropy.toFixed(2)}</span>
+              <span style={{ color: r.color }}>{r.class}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
