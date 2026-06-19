@@ -55,6 +55,9 @@ def _to_detail(scan: Scan) -> ScanDetailResponse:
         detail.cve = json.loads(scan.cve_json)
     if scan.disasm_json:
         detail.disasm = json.loads(scan.disasm_json)
+    # Rootfs is stored inside extraction_json["rootfs"] (Feature 5)
+    if detail.extraction and isinstance(detail.extraction.get("rootfs"), dict):
+        detail.rootfs = detail.extraction["rootfs"]
     return detail
 
 

@@ -74,6 +74,8 @@ class ScanDetailResponse(ScanResponse):
     disasm_status: str | None = None
     disasm: dict[str, Any] | None = None
     disasm_error: str | None = None
+    # Rootfs deep analysis (Feature 5) — stored inside extraction_json["rootfs"]
+    rootfs: dict[str, Any] | None = None
 
 
 class ScanListResponse(BaseModel):

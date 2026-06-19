@@ -83,7 +83,7 @@ export default function ScanDetailPage() {
   const router = useRouter();
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree" | "arch" | "sbom" | "crypto" | "compliance" | "peripherals">("strings");
+  const [tab, setTab] = useState<"strings" | "yara" | "binwalk" | "tree" | "arch" | "sbom" | "crypto" | "compliance" | "peripherals" | "rootfs">("strings");
   const [extractError, setExtractError] = useState("");
   const [decompileError, setDecompileError] = useState("");
   const [triggeringExtract, setTriggeringExtract] = useState(false);
@@ -229,6 +229,8 @@ export default function ScanDetailPage() {
   const disasmResult   = scan.disasm        ?? {};
   const peripheralInfo = report?.peripherals ?? { available: false, peripherals: [], flags: [], flag_names: [] };
   const cryptoKeysInfo = report?.crypto_keys ?? { available: false, keys: [], count: 0, has_private: false };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rootfsInfo = (scan as any).rootfs ?? { available: false };
 
   const suspicious: { value: string; category: string; offset: number; encoding: string }[] =
     stringsInfo.suspicious ?? [];
@@ -405,6 +407,7 @@ export default function ScanDetailPage() {
                   ["crypto",     "Crypto",        cryptoInfo.count ?? null],
                   ["compliance",  "Compliance",    (complianceData.mappings as unknown[])?.length ?? null],
                   ["peripherals","Peripherals",   (peripheralInfo.peripherals as unknown[])?.length || null],
+                  ["rootfs",     "Rootfs",        rootfsInfo.available ? ((rootfsInfo.flags as unknown[])?.length || 0) : null],
                   ["tree",       "Pipeline Tree", null],
                 ] as [typeof tab, string, number | null][]
               ).map(([t, label, count]) => (
@@ -728,6 +731,114 @@ export default function ScanDetailPage() {
                       </div>
                     ) : (
                       <p className="text-sm text-slate-500 text-center py-4">No peripheral accesses detected.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Rootfs tab */}
+            {tab === "rootfs" && (
+              <div className="space-y-4">
+                {!rootfsInfo.available ? (
+                  <p className="text-sm text-slate-500 text-center py-8">
+                    Rootfs analysis not available — run Binwalk extraction first. A Linux filesystem must be present in the firmware.
+                  </p>
+                ) : (
+                  <>
+                    {/* Flags */}
+                    {Array.isArray(rootfsInfo.flags) && rootfsInfo.flags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(rootfsInfo.flags as string[]).map((f, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-900/40 text-red-400 font-mono">{f}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Accounts */}
+                    {Array.isArray(rootfsInfo.accounts) && rootfsInfo.accounts.length > 0 && (
+                      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                        <div className="px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                          User Accounts ({(rootfsInfo.accounts as unknown[]).length})
+                        </div>
+                        <div className="max-h-48 overflow-y-auto divide-y divide-[#1f2840]">
+                          {(rootfsInfo.accounts as { user: string; uid: number; shell: string }[]).map((a, i) => (
+                            <div key={i} className="flex items-center gap-3 px-3 py-1.5 text-xs">
+                              <span className={`font-mono font-semibold ${a.uid === 0 ? "text-red-400" : "text-slate-300"}`}>{a.user}</span>
+                              <span className="text-slate-500">uid={a.uid}</span>
+                              <span className="font-mono text-slate-600 truncate">{a.shell}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SSH keys */}
+                    {Array.isArray(rootfsInfo.ssh_keys) && rootfsInfo.ssh_keys.length > 0 && (
+                      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                        <div className="px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                          SSH Keys / Authorized Keys
+                        </div>
+                        <div className="divide-y divide-[#1f2840]">
+                          {(rootfsInfo.ssh_keys as { path: string; is_private: boolean; type: string }[]).map((k, i) => (
+                            <div key={i} className="flex items-center gap-3 px-3 py-2 text-xs">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${k.is_private ? "bg-red-900/40 text-red-400" : "bg-slate-800 text-slate-400"}`}>
+                                {k.is_private ? "PRIVATE" : k.type}
+                              </span>
+                              <span className="font-mono text-slate-400 truncate">{k.path}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Config secrets */}
+                    {Array.isArray(rootfsInfo.config_secrets) && rootfsInfo.config_secrets.length > 0 && (
+                      <div className="rounded-lg border border-[#1f2840] overflow-hidden">
+                        <div className="px-3 py-2 border-b border-[#1f2840] text-[10px] font-bold uppercase tracking-widest text-slate-600" style={{ background: "#121826" }}>
+                          Hardcoded Secrets in Config Files ({(rootfsInfo.config_secrets as unknown[]).length})
+                        </div>
+                        <div className="max-h-48 overflow-y-auto divide-y divide-[#1f2840]">
+                          {(rootfsInfo.config_secrets as { path: string; excerpt: string }[]).map((s, i) => (
+                            <div key={i} className="px-3 py-2 text-xs">
+                              <p className="font-mono text-slate-400 text-[10px]">{s.path}</p>
+                              <p className="font-mono text-amber-400 mt-0.5 truncate">{s.excerpt}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUID / world-writable */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-[#1f2840] p-3" style={{ background: "#0b0f1a" }}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">SUID/SGID Binaries</p>
+                        {Array.isArray(rootfsInfo.suid_files) && rootfsInfo.suid_files.length > 0 ? (
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {(rootfsInfo.suid_files as { path: string; outside_safe: boolean }[]).map((s, i) => (
+                              <p key={i} className={`text-[10px] font-mono truncate ${s.outside_safe ? "text-orange-400" : "text-slate-500"}`}>{s.path}</p>
+                            ))}
+                          </div>
+                        ) : <p className="text-xs text-slate-600">None found</p>}
+                      </div>
+                      <div className="rounded-lg border border-[#1f2840] p-3" style={{ background: "#0b0f1a" }}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">World-Writable Files</p>
+                        {Array.isArray(rootfsInfo.world_writable) && rootfsInfo.world_writable.length > 0 ? (
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {(rootfsInfo.world_writable as { path: string }[]).map((w, i) => (
+                              <p key={i} className="text-[10px] font-mono text-amber-400 truncate">{w.path}</p>
+                            ))}
+                          </div>
+                        ) : <p className="text-xs text-slate-600">None found</p>}
+                      </div>
+                    </div>
+
+                    {/* Kernel banner */}
+                    {rootfsInfo.kernel_banner && (
+                      <div className="rounded-lg border border-[#1f2840] px-3 py-2 text-xs font-mono text-slate-400" style={{ background: "#0b0f1a" }}>
+                        <span className="text-slate-600 text-[10px] font-bold uppercase tracking-widest mr-2">Kernel:</span>
+                        {String(rootfsInfo.kernel_banner).split("\n")[0]}
+                      </div>
                     )}
                   </>
                 )}

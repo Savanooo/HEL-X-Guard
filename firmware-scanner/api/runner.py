@@ -264,6 +264,35 @@ def start_scan_thread(scan_id: str, stored_path: str) -> None:
 
 # ── Extraction (Faz 2 deep analysis) ──────────────────────────────────────────
 
+def _find_and_analyze_rootfs(out_dir: Path) -> dict:
+    """Search the binwalk output directory for a Linux rootfs and analyse it.
+
+    Heuristic: look for a directory that contains at least two of
+    {etc, bin, lib, usr, sbin} — typical Linux FHS layout.
+    Never executes anything in the extracted tree.
+    """
+    from firmware_scanner import rootfs_analysis
+
+    _FS_MARKERS = {"etc", "bin", "lib", "usr", "sbin"}
+    best: Path | None = None
+    best_score = 0
+
+    for candidate in [out_dir, *out_dir.rglob("*")]:
+        if not candidate.is_dir():
+            continue
+        children = {c.name for c in candidate.iterdir() if c.is_dir()}
+        score = len(_FS_MARKERS & children)
+        if score > best_score:
+            best_score = score
+            best = candidate
+        if best_score >= 3:
+            break   # good enough
+
+    if best is not None and best_score >= 2:
+        return rootfs_analysis.analyze(best)
+    return {"available": False, "error": "No Linux rootfs found in extraction output"}
+
+
 def _run_extraction(scan_id: str, stored_path: str) -> None:
     db = SessionLocal()
     try:
@@ -274,7 +303,7 @@ def _run_extraction(scan_id: str, stored_path: str) -> None:
         scan.extraction_status = "running"
         db.commit()
 
-        from firmware_scanner import binwalk_runner
+        from firmware_scanner import binwalk_runner, rootfs_analysis
 
         local_path, is_temp = storage.resolve_for_analysis(stored_path)
         try:
@@ -282,6 +311,13 @@ def _run_extraction(scan_id: str, stored_path: str) -> None:
             result = binwalk_runner.extract(local_path, out_dir)
         finally:
             storage.cleanup_temp(local_path, is_temp)
+
+        # After extraction, look for a Linux rootfs in the output directory
+        # (binwalk typically extracts to a sub-directory named after the file)
+        rootfs_result: dict = {"available": False}
+        if out_dir.is_dir():
+            rootfs_result = _find_and_analyze_rootfs(out_dir)
+        result["rootfs"] = rootfs_result
 
         scan = db.get(Scan, scan_id)
         if scan is not None:
