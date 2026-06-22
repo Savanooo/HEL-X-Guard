@@ -4,7 +4,7 @@ services:
       context: ./firmware-scanner
       dockerfile: Dockerfile.api
     ports:
-      - "8000:8000"
+      - "4521:8000"
     env_file:
       - ./firmware-scanner/.env
     volumes:
@@ -22,7 +22,7 @@ services:
       context: ./helix-frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:4521}
     ports:
       - "3000:3000"
     depends_on:
